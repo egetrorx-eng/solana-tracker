@@ -62,7 +62,7 @@ function generateMockData(timeframe: string): NansenToken[] {
 }
 
 // Main handler function
-export const handler: Handler = async () => {
+const myHandler: Handler = async () => {
     console.log('Starting scheduled update-flows function...')
 
     try {
@@ -128,5 +128,4 @@ export const handler: Handler = async () => {
     }
 }
 
-// Schedule the function to run every 5 minutes (adjusted for personal plan)
-export const updateFlowsScheduled = schedule('*/5 * * * *', handler)
+export const handler = schedule('*/5 * * * *', myHandler)
