@@ -1,0 +1,121 @@
+---
+description: Stack architecture rules for the Agency Astro Starter
+globs: 
+alwaysApply: true
+---
+
+# 🚨 FIRST TIME ON THIS PROJECT?
+
+**Read `.cursor/AGENT-ONBOARDING.md` before making any changes!**
+
+It explains the tier system, available modules, Context7 usage, and Swiss B2B standards.
+
+---
+
+# Stack Architecture Rules
+
+## Module Configuration
+
+ALWAYS check `stack.config.js` before suggesting code. The project tier determines available modules:
+
+- **Basic tier**: Astro + Resend only
+- **CMS tier**: Astro + Sanity + Resend  
+- **FullStack tier**: Astro + Sanity + Supabase + Resend
+
+## Import Rules
+
+### If `modules.sanity = false`:
+- NEVER import from `@/lib/sanity` or `src/lib/sanity.ts`
+- NEVER suggest Sanity queries or GROQ
+- NEVER reference the `sanity/` folder
+
+### If `modules.supabase = false`:
+- NEVER import from `@/lib/supabase` or `src/lib/supabase.ts`
+- NEVER suggest database queries or auth patterns
+- NEVER reference the `supabase/` folder
+
+### Always Available:
+- `@/lib/resend` - Email utilities (all tiers)
+- `netlify/functions/` - Serverless functions (all tiers)
+
+## Component Architecture
+
+### Astro Components (`src/components/astro/`)
+- Use for static content that doesn't need interactivity
+- Prefer Astro components over React for better performance
+- Can import and render React islands
+
+### React Islands (`src/components/react/`)
+- Use ONLY for interactive elements:
+  - Forms with client-side validation
+  - Maps and interactive visualizations
+  - Galleries with lightboxes
+  - Complex state management
+- Always use `client:load` or `client:visible` directives
+- Keep islands small and focused
+
+## Data Fetching Patterns
+
+### Basic Tier
+```astro
+---
+// Static data in frontmatter
+const data = await fetch('...').then(r => r.json());
+---
+```
+
+### CMS Tier
+```astro
+---
+import { sanityClient, queries } from '@/lib/sanity';
+const data = await sanityClient.fetch(queries.siteSettings);
+---
+```
+
+### FullStack Tier
+```astro
+---
+import { sanityClient } from '@/lib/sanity';
+import { supabase } from '@/lib/supabase';
+
+// CMS content
+const content = await sanityClient.fetch('...');
+
+// User data (server-side)
+const { data: userData } = await supabase.from('profiles').select('*');
+---
+```
+
+## Swiss B2B Standards
+
+### Language & Tone
+- Use formal German ("Sie" not "du") in user-facing content
+- Swiss German locale: `de-CH`
+- Professional, trustworthy tone
+- Avoid marketing fluff
+
+### UI Components
+- Use the pre-defined button classes: `btn-primary`, `btn-secondary`, `btn-outline`
+- Use the card component: `card` class
+- Use proper section spacing: `section` class
+- Use containers: `container-narrow` or `container-wide`
+
+## File Organization
+
+```
+src/
+├── components/
+│   ├── astro/        # Static Astro components
+│   └── react/        # Interactive React islands
+├── layouts/          # Page layouts
+├── lib/              # Client libraries (Sanity, Supabase, Resend)
+├── pages/            # Astro routes
+└── styles/           # Global styles
+```
+
+## Performance Guidelines
+
+1. Prefer static generation over server rendering
+2. Use `client:visible` for below-fold React components
+3. Optimize images with Astro's Image component
+4. Keep JavaScript bundles small by limiting React islands

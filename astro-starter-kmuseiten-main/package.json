@@ -1,0 +1,48 @@
+{
+  "name": "agency-astro-starter",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Modular Astro starter with Sanity, Supabase, and Resend integration",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "init:project": "node scripts/init-project.js",
+    "github:setup": "node scripts/setup-github.js",
+    "github:save": "node scripts/github-save.js",
+    "module:toggle": "node scripts/toggle-module.js",
+    "sanity:dev": "cd sanity && sanity dev",
+    "sanity:deploy": "cd sanity && sanity deploy",
+    "sanity:build": "cd sanity && sanity build",
+    "sanity:typegen": "sanity schema extract && sanity typegen generate"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/netlify": "^6.0.0",
+    "@astrojs/react": "^4.1.0",
+    "@astrojs/sitemap": "^3.2.1",
+    "@astrojs/tailwind": "^6.0.0",
+    "@sanity/astro": "^3.2.1",
+    "@sanity/client": "^6.24.1",
+    "@sanity/image-url": "^1.1.0",
+    "@supabase/supabase-js": "^2.47.10",
+    "astro": "^5.1.0",
+    "astro-portabletext": "^0.10.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "resend": "^4.0.1",
+    "sanity": "^3.68.3",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "dotenv": "^16.4.7",
+    "inquirer": "^12.2.0"
+  }
+}
+

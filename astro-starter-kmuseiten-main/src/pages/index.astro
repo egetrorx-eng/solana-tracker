@@ -1,0 +1,219 @@
+---
+/**
+ * Home Page
+ * ═══════════════════════════════════════════════════════════════
+ * Landing page with hero, features, and contact sections.
+ * Fetches content from Sanity CMS if enabled.
+ */
+
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Header from '@/components/astro/Header.astro';
+import Footer from '@/components/astro/Footer.astro';
+import ContactForm from '@/components/react/ContactForm';
+import stackConfig from '../../stack.config.js';
+
+// Conditional Sanity imports and data fetching
+let siteSettings: any = null;
+
+if (stackConfig.modules.sanity) {
+  const { sanityClient } = await import('sanity:client');
+  const { queries } = await import('@/lib/sanity');
+  
+  siteSettings = await sanityClient.fetch(queries.siteSettings).catch(() => null);
+}
+
+// Page content (from CMS or defaults)
+const title = siteSettings?.title || stackConfig.project.name;
+const description = siteSettings?.description || stackConfig.project.description;
+const heroTitle = siteSettings?.heroTitle || 'Willkommen';
+const heroSubtitle = siteSettings?.heroSubtitle || 'Ihr Partner für digitale Lösungen';
+---
+
+<BaseLayout title={title} description={description}>
+  <Header />
+
+  <main class="pt-16 md:pt-20">
+    <!-- Hero Section -->
+    <section class="section bg-gradient-to-b from-primary-50 to-white">
+      <div class="container-wide">
+        <div class="max-w-3xl mx-auto text-center">
+          <h1 class="text-balance mb-6">
+            {heroTitle}
+          </h1>
+          <p class="text-xl text-neutral-600 mb-8">
+            {heroSubtitle}
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="#contact" class="btn-primary">
+              Kontakt aufnehmen
+            </a>
+            <a href="#services" class="btn-outline">
+              Mehr erfahren
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="services" class="section">
+      <div class="container-wide">
+        <h2 class="text-center mb-12">Unsere Leistungen</h2>
+        <div class="grid md:grid-cols-3 gap-8">
+          <div class="card">
+            <div
+              class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-4"
+            >
+              <svg
+                class="w-6 h-6 text-primary-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+            <h3 class="text-xl mb-2">Schnell</h3>
+            <p class="text-neutral-600">
+              Blitzschnelle Ladezeiten dank moderner Astro-Architektur.
+            </p>
+          </div>
+          <div class="card">
+            <div
+              class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-4"
+            >
+              <svg
+                class="w-6 h-6 text-primary-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                ></path>
+              </svg>
+            </div>
+            <h3 class="text-xl mb-2">Sicher</h3>
+            <p class="text-neutral-600">
+              Höchste Sicherheitsstandards für Ihre Daten und Kunden.
+            </p>
+          </div>
+          <div class="card">
+            <div
+              class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-4"
+            >
+              <svg
+                class="w-6 h-6 text-primary-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+                ></path>
+              </svg>
+            </div>
+            <h3 class="text-xl mb-2">Flexibel</h3>
+            <p class="text-neutral-600">
+              Modulare Architektur, die mit Ihren Anforderungen wächst.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section bg-neutral-50">
+      <div class="container-wide">
+        <div class="grid md:grid-cols-2 gap-12 items-center">
+          <div>
+            <h2 class="mb-6">Über uns</h2>
+            <p class="text-neutral-600 mb-4">
+              Wir sind ein erfahrenes Team von Entwicklern und Designern, das sich auf
+              die Erstellung moderner Webapplikationen spezialisiert hat.
+            </p>
+            <p class="text-neutral-600 mb-6">
+              Mit unserem bewährten Tech-Stack aus Astro, Sanity und Supabase
+              liefern wir skalierbare Lösungen, die Ihre Geschäftsziele
+              unterstützen.
+            </p>
+            <ul class="space-y-3">
+              <li class="flex items-center gap-3">
+                <svg
+                  class="w-5 h-5 text-primary-600 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"></path>
+                </svg>
+                <span>Moderne Technologien</span>
+              </li>
+              <li class="flex items-center gap-3">
+                <svg
+                  class="w-5 h-5 text-primary-600 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"></path>
+                </svg>
+                <span>Schweizer Qualitätsstandards</span>
+              </li>
+              <li class="flex items-center gap-3">
+                <svg
+                  class="w-5 h-5 text-primary-600 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"></path>
+                </svg>
+                <span>Persönliche Betreuung</span>
+              </li>
+            </ul>
+          </div>
+          <div class="bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl aspect-square flex items-center justify-center">
+            <div class="text-center p-8">
+              <div class="text-6xl font-bold text-primary-600 mb-2">10+</div>
+              <div class="text-primary-700 font-medium">Jahre Erfahrung</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section">
+      <div class="container-narrow">
+        <div class="text-center mb-12">
+          <h2 class="mb-4">Kontakt aufnehmen</h2>
+          <p class="text-neutral-600 text-lg">
+            Haben Sie ein Projekt im Sinn? Wir freuen uns auf Ihre Nachricht.
+          </p>
+        </div>
+        <div class="max-w-xl mx-auto">
+          <ContactForm client:visible />
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
