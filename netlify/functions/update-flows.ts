@@ -39,8 +39,7 @@ async function fetchNansenData(timeframe: string): Promise<NansenToken[]> {
         return data.tokens || []
     } catch (error) {
         console.error(`Error fetching Nansen data for ${timeframe}:`, error)
-        // Return mock data for development
-        return generateMockData(timeframe)
+        throw error
     }
 }
 

@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
 
         console.log(`API get-flows called for timeframe: ${timeframe}`)
 
+        console.log(`Supabase connecting with URL: ${process.env.SUPABASE_URL ? 'PRESENT' : 'MISSING'}`)
+
         // Query Supabase for latest data for the specified timeframe
         const { data, error } = await supabase
             .from('token_flows')
@@ -17,11 +19,11 @@ export async function GET(request: NextRequest) {
             .limit(50)
 
         if (error) {
-            console.error('Supabase error:', error)
+            console.error('Supabase error:', error.message)
             throw error
         }
 
-        console.log(`Supabase returned ${data?.length} rows`)
+        console.log(`Supabase returned ${data?.length || 0} rows for ${timeframe}`)
 
         // Format data for frontend
         const formattedData = (data || []).map(token => ({

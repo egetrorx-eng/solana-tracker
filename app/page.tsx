@@ -147,6 +147,9 @@ export default function Dashboard() {
                         <table className="min-w-full border-collapse">
                             <thead>
                                 <tr className="border-b border-green-dark">
+                                    <th className="text-left p-3 w-12 font-mono opacity-50">
+                                        #
+                                    </th>
                                     <th
                                         className="text-left p-3 sticky left-0 bg-black z-10 min-w-[80px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('symbol')}
@@ -220,6 +223,9 @@ export default function Dashboard() {
                                             key={`${token.symbol}-${idx}`}
                                             className="border-b border-green-dark/30 hover:bg-green-darker transition-colors"
                                         >
+                                            <td className="p-3 text-left font-mono opacity-50">
+                                                {idx + 1}
+                                            </td>
                                             <td className="p-3 sticky left-0 bg-black z-10 font-bold">
                                                 {token.symbol}
                                             </td>
