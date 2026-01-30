@@ -102,7 +102,7 @@ export default function Dashboard() {
                     Powered by{' '}
                     <a
                         href="https://nsn.ai/gamefi?utm_source=tracker"
-                        className="underline hover:text-green-400 transition-colors"
+                        className="underline hover:text-green transition-colors"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
@@ -148,55 +148,55 @@ export default function Dashboard() {
                             <thead>
                                 <tr className="border-b border-green-dark">
                                     <th
-                                        className="text-left p-3 sticky left-0 bg-black z-10 min-w-[80px] cursor-pointer hover:text-white select-none"
+                                        className="text-left p-3 sticky left-0 bg-black z-10 min-w-[80px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('symbol')}
                                     >
                                         SYMBOL <SortIcon columnKey="symbol" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[100px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[100px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('price_change')}
                                     >
                                         {timeframe} % <SortIcon columnKey="price_change" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('market_cap')}
                                     >
                                         MARKETCAP <SortIcon columnKey="market_cap" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('smart_wallets')}
                                     >
                                         SM WALLETS <SortIcon columnKey="smart_wallets" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('volume')}
                                     >
                                         VOLUMES <SortIcon columnKey="volume" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('liquidity')}
                                     >
                                         LIQUIDITY <SortIcon columnKey="liquidity" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('inflows')}
                                     >
                                         INFLOWS <SortIcon columnKey="inflows" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('outflows')}
                                     >
                                         OUTFLOWS <SortIcon columnKey="outflows" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:text-white select-none"
+                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('net_flows')}
                                     >
                                         NET FLOWS <SortIcon columnKey="net_flows" />
