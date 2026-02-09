@@ -124,6 +124,7 @@ async function main() {
 
                 await supabase.from('token_flows').upsert({
                     symbol: token.token_symbol,
+                    token_address: token.token_address,
                     timeframe: map.db,
                     price_change_pct: dexData?.priceChange?.[map.dexKey] || 0,
                     market_cap: token.market_cap_usd || dexData?.fdv || 0,

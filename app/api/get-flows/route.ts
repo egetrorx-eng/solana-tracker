@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         // Format data for frontend
         const formattedData = data.map(token => ({
             symbol: token.symbol,
+            token_address: token.token_address || '',
             price_change: parseFloat(token.price_change_pct || 0),
             market_cap: parseFloat(token.market_cap || 0),
             smart_wallets: token.smart_wallet_count || 0,

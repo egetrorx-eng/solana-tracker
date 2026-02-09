@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const TIMEFRAMES = ['5MIN', '10MIN', '30MIN', '1H', '6H', '12H', '24H']
 
 interface TokenData {
     symbol: string
+    token_address?: string
     price_change: number
     market_cap: number
     smart_wallets: number
@@ -17,6 +18,20 @@ interface TokenData {
     token_age?: number
     token_sectors?: string[]
 }
+
+const MARKET_CAP_FILTERS = [
+    { label: 'All', value: 0 },
+    { label: '>$100K', value: 100000 },
+    { label: '>$500K', value: 500000 },
+    { label: '>$1M', value: 1000000 },
+    { label: '>$5M', value: 5000000 },
+]
+
+const FLOW_FILTERS = [
+    { label: 'All', value: 'all' },
+    { label: 'Inflows Only', value: 'inflows' },
+    { label: 'Outflows Only', value: 'outflows' },
+]
 
 function formatNumber(num: number | null | undefined): string {
     if (num === null || num === undefined || isNaN(num)) {
@@ -63,6 +78,9 @@ export default function Dashboard() {
     const [sortConfig, setSortConfig] = useState<{ key: keyof TokenData; direction: 'asc' | 'desc' } | null>({ key: 'net_flows', direction: 'desc' })
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
     const [countdown, setCountdown] = useState(30)
+    const [minMarketCap, setMinMarketCap] = useState(0)
+    const [flowFilter, setFlowFilter] = useState<'all' | 'inflows' | 'outflows'>('all')
+    const [soundEnabled, setSoundEnabled] = useState(false)
 
     const handleSort = (key: keyof TokenData) => {
         let direction: 'asc' | 'desc' = 'desc'
@@ -72,7 +90,15 @@ export default function Dashboard() {
         setSortConfig({ key, direction })
     }
 
-    const sortedData = [...data].sort((a, b) => {
+    // Apply filters
+    const filteredData = data.filter(token => {
+        if (token.market_cap < minMarketCap) return false
+        if (flowFilter === 'inflows' && token.net_flows <= 0) return false
+        if (flowFilter === 'outflows' && token.net_flows >= 0) return false
+        return true
+    })
+
+    const sortedData = [...filteredData].sort((a, b) => {
         if (!sortConfig) return 0
         const { key, direction } = sortConfig
 
@@ -126,6 +152,47 @@ export default function Dashboard() {
         setLoading(false)
     }, [timeframe])
 
+    // Sound alert function
+    const playAlertSound = useCallback(() => {
+        if (typeof window === 'undefined') return
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+            if (!AudioContextClass) return
+            const audioContext = new AudioContextClass()
+            const oscillator = audioContext.createOscillator()
+            const gainNode = audioContext.createGain()
+            oscillator.connect(gainNode)
+            gainNode.connect(audioContext.destination)
+            oscillator.frequency.value = 800
+            oscillator.type = 'sine'
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+            oscillator.start(audioContext.currentTime)
+            oscillator.stop(audioContext.currentTime + 0.3)
+        } catch {
+            console.log('Audio not available')
+        }
+    }, [])
+
+    // Track previous data for sound alerts
+    const prevDataRef = useRef<TokenData[]>([])
+
+    useEffect(() => {
+        if (soundEnabled && data.length > 0 && prevDataRef.current.length > 0) {
+            // Check for new big inflows (>$100K)
+            const newBigInflows = data.filter(token => {
+                const prev = prevDataRef.current.find(p => p.symbol === token.symbol)
+                if (!prev) return token.net_flows > 100000
+                return token.net_flows > prev.net_flows && token.net_flows > 100000
+            })
+            if (newBigInflows.length > 0) {
+                playAlertSound()
+            }
+        }
+        prevDataRef.current = data
+    }, [data, soundEnabled, playAlertSound])
+
     useEffect(() => {
         fetchData()
         const interval = setInterval(fetchData, 30000)
@@ -162,36 +229,34 @@ export default function Dashboard() {
 
             {/* Header */}
             <div className="mb-6 relative z-20">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl md:text-4xl font-bold mb-1 tracking-tighter glow-text uppercase italic">
-                            SOLANA MICROCAP SMART MONEY TRACKER
-                        </h1>
-                        <div className="flex items-center gap-4 text-xs font-mono">
-                            <p className="opacity-80">
-                                SOURCE: <a
-                                    href="https://nsn.ai/gamefi?utm_source=tracker"
-                                    className="underline hover:glow-text transition-all"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    NANSEN_INTELLIGENCE_API
-                                </a>
-                            </p>
-                            <span className="opacity-50">|</span>
-                            <span className="text-green/60">TRACKING {data.length} TOKENS</span>
-                        </div>
+                <div className="flex flex-col gap-2">
+                    <h1 className="text-2xl md:text-4xl font-bold tracking-tighter glow-text uppercase italic glitch-text relative">
+                        SOLANA MICROCAP SMART MONEY TRACKER
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+                        <span className="opacity-80">
+                            SOURCE: <a
+                                href="https://nsn.ai/gamefi?utm_source=tracker"
+                                className="underline hover:glow-text transition-all"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                NANSEN_INTELLIGENCE_API
+                            </a>
+                        </span>
                     </div>
-                    <div className="flex items-center gap-4 text-xs font-mono">
-                        {lastUpdated && (
-                            <span className="opacity-50">
-                                UPDATED: {lastUpdated.toLocaleTimeString()}
-                            </span>
-                        )}
-                        <div className="flex items-center gap-2 px-3 py-1 bg-green/5 border border-green/20 rounded">
-                            <div className={`w-2 h-2 rounded-full ${countdown <= 5 ? 'bg-yellow-500 animate-pulse' : 'bg-green/50'}`} />
-                            <span className="tabular-nums">REFRESH: {countdown}s</span>
-                        </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-xs font-mono mt-4">
+                    <span className="text-green/60">TRACKING {data.length} TOKENS</span>
+                    <span className="opacity-50">|</span>
+                    {lastUpdated && (
+                        <span className="opacity-50">
+                            UPDATED: {lastUpdated.toLocaleTimeString()}
+                        </span>
+                    )}
+                    <div className="flex items-center gap-2 px-3 py-1 bg-green/5 border border-green/20 rounded">
+                        <div className={`w-2 h-2 rounded-full ${countdown <= 5 ? 'bg-yellow-500 animate-pulse' : 'bg-green/50'}`} />
+                        <span className="tabular-nums">REFRESH: {countdown}s</span>
                     </div>
                 </div>
             </div>
@@ -208,7 +273,7 @@ export default function Dashboard() {
                             }`}
                         title={`Press ${idx + 1} for ${tf}`}
                     >
-                        <span className="opacity-40 mr-1">{idx + 1}:</span>{tf}
+                        {tf}
                     </button>
                 ))}
                 <button
@@ -216,8 +281,44 @@ export default function Dashboard() {
                     className="px-4 py-2 border border-green text-green hover:bg-green-darker transition-all font-mono"
                     title="Press R to refresh"
                 >
-                    <span className="opacity-40 mr-1">R:</span>REFRESH
+                    ↻ REFRESH
                 </button>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-4 mb-4 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                    <span className="opacity-60">MCAP:</span>
+                    <select
+                        value={minMarketCap}
+                        onChange={(e) => setMinMarketCap(Number(e.target.value))}
+                        className="bg-black border border-green/30 text-green px-2 py-1 rounded focus:border-green outline-none"
+                    >
+                        {MARKET_CAP_FILTERS.map(f => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="opacity-60">FLOWS:</span>
+                    <select
+                        value={flowFilter}
+                        onChange={(e) => setFlowFilter(e.target.value as 'all' | 'inflows' | 'outflows')}
+                        className="bg-black border border-green/30 text-green px-2 py-1 rounded focus:border-green outline-none"
+                    >
+                        {FLOW_FILTERS.map(f => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                        ))}
+                    </select>
+                </div>
+                <button
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className={`px-3 py-1 border rounded transition-all ${soundEnabled ? 'border-green bg-green/20 text-green' : 'border-green/30 text-green/50'}`}
+                    title="Toggle sound alerts for big inflows"
+                >
+                    {soundEnabled ? '🔊 ALERTS ON' : '🔇 ALERTS OFF'}
+                </button>
+                <span className="opacity-40 ml-auto">Showing {sortedData.length} of {data.length} tokens</span>
             </div>
 
             {/* Loading Indicator */}
@@ -329,7 +430,15 @@ export default function Dashboard() {
                                                 {idx + 1}
                                             </td>
                                             <td className="p-2 sticky left-0 bg-black z-10 font-bold group-hover:glow-text transition-all">
-                                                {token.symbol}
+                                                <a
+                                                    href={`https://dexscreener.com/solana/${token.token_address || token.symbol}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="hover:underline hover:text-green transition-all"
+                                                    title="View on DexScreener"
+                                                >
+                                                    {token.symbol} ↗
+                                                </a>
                                             </td>
                                             <td className="p-2 text-center">
                                                 <FlowArrow value={token.net_flows} />
