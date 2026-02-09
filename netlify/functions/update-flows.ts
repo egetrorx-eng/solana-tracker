@@ -56,7 +56,7 @@ const myHandler: Handler = async () => {
                 },
                 body: JSON.stringify({
                     chains: ['solana'],
-                    pagination: { page: 1, per_page: 20 },
+                    pagination: { page: 1, per_page: 50 },
                     order_by: [{ direction: 'DESC', field: 'net_flow_24h_usd' }]
                 })
             }
@@ -70,7 +70,7 @@ const myHandler: Handler = async () => {
         const json = await nansenResponse.json()
         const nansenTokens = json.data || []
 
-        console.log(`Fetched ${nansenTokens.length} tokens from Nansen for 24h`)
+        console.log(`Fetched ${nansenTokens.length} tokens from Nansen`)
 
         // Enrich with DexScreener data
         const addresses = nansenTokens.map((t: any) => t.token_address).filter(Boolean)
@@ -113,6 +113,7 @@ const myHandler: Handler = async () => {
 
                 const { error } = await supabase.from('token_flows').upsert({
                     symbol: token.token_symbol,
+                    token_address: token.token_address,
                     timeframe: map.db,
                     price_change_pct: dexData?.priceChange?.[map.dexKey] || 0,
                     market_cap: token.market_cap_usd || dexData?.fdv || 0,
@@ -131,19 +132,6 @@ const myHandler: Handler = async () => {
                     console.error(`Error upserting ${token.token_symbol} for ${map.db}:`, error)
                 }
             }
-        }
-
-        // Delete data older than 24 hours
-        const twentyFourHoursAgo = new Date()
-        twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
-
-        const { error: deleteError } = await supabase
-            .from('token_flows')
-            .delete()
-            .lt('fetched_at', twentyFourHoursAgo.toISOString())
-
-        if (deleteError) {
-            console.error('Error deleting old data:', deleteError)
         }
 
         console.log('Update-flows function completed successfully')

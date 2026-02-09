@@ -8,6 +8,7 @@ export function generateMockFlows() {
 
         return {
             symbol,
+            token_address: `So11111111111111111111111111111111111111112`, // Dummy SOL address
             price_change: (Math.random() - 0.5) * 20,
             market_cap: Math.random() * 5000000,
             smart_wallets: Math.floor(Math.random() * 50) + 1,
@@ -18,6 +19,7 @@ export function generateMockFlows() {
             net_flows: netFlows,
             token_age: Math.floor(Math.random() * 30) + 1,
             token_sectors: ['Meme', 'Community'],
+            price_history: Array.from({ length: 15 }, () => (Math.random() - 0.5) * 20),
         }
     })
 }
