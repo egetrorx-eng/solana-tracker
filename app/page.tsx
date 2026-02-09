@@ -17,6 +17,7 @@ interface TokenData {
     net_flows: number
     token_age?: number
     token_sectors?: string[]
+    price_history?: number[]
 }
 
 const MARKET_CAP_FILTERS = [
@@ -70,6 +71,41 @@ function FlowArrow({ value }: { value: number }) {
     return <span className="text-green/30">–</span>
 }
 
+function Sparkline({ data }: { data: number[] }) {
+    if (!data || data.length < 2) return <div className="w-16 h-8 opacity-20 border-b border-green/20" />
+
+    const min = Math.min(...data)
+    const max = Math.max(...data)
+    const range = max - min || 1
+    const width = 80
+    const height = 30
+    const padding = 2
+
+    const points = data.map((val, i) => {
+        const x = (i / (data.length - 1)) * width
+        const y = padding + (height - 2 * padding) * (1 - (val - min) / range)
+        return `${x},${y}`
+    }).join(' ')
+
+    const isUp = data[data.length - 1] >= data[0]
+
+    return (
+        <div className="w-20 h-8 flex items-center">
+            <svg width={width} height={height} className="overflow-visible">
+                <polyline
+                    fill="none"
+                    stroke={isUp ? '#00FF41' : '#ff4444'}
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    points={points}
+                    className="drop-shadow-[0_0_2px_rgba(0,255,65,0.5)]"
+                />
+            </svg>
+        </div>
+    )
+}
+
 export default function Dashboard() {
     const [timeframe, setTimeframe] = useState('5MIN')
     const [data, setData] = useState<TokenData[]>([])
@@ -80,7 +116,11 @@ export default function Dashboard() {
     const [countdown, setCountdown] = useState(30)
     const [minMarketCap, setMinMarketCap] = useState(0)
     const [flowFilter, setFlowFilter] = useState<'all' | 'inflows' | 'outflows'>('all')
+    const [sectorFilter, setSectorFilter] = useState('All')
     const [soundEnabled, setSoundEnabled] = useState(false)
+
+    // Extract unique sectors for filter
+    const uniqueSectors = Array.from(new Set(data.flatMap(t => t.token_sectors || []))).sort()
 
     const handleSort = (key: keyof TokenData) => {
         let direction: 'asc' | 'desc' = 'desc'
@@ -95,6 +135,7 @@ export default function Dashboard() {
         if (token.market_cap < minMarketCap) return false
         if (flowFilter === 'inflows' && token.net_flows <= 0) return false
         if (flowFilter === 'outflows' && token.net_flows >= 0) return false
+        if (sectorFilter !== 'All' && !token.token_sectors?.includes(sectorFilter)) return false
         return true
     })
 
@@ -311,6 +352,19 @@ export default function Dashboard() {
                         ))}
                     </select>
                 </div>
+                <div className="flex items-center gap-2">
+                    <span className="opacity-60">SECTOR:</span>
+                    <select
+                        value={sectorFilter}
+                        onChange={(e) => setSectorFilter(e.target.value)}
+                        className="bg-black border border-green/30 text-green px-2 py-1 rounded focus:border-green outline-none max-w-[120px]"
+                    >
+                        <option value="All">All Sectors</option>
+                        {uniqueSectors.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                        ))}
+                    </select>
+                </div>
                 <button
                     onClick={() => setSoundEnabled(!soundEnabled)}
                     className={`px-3 py-1 border rounded transition-all ${soundEnabled ? 'border-green bg-green/20 text-green' : 'border-green/30 text-green/50'}`}
@@ -331,6 +385,11 @@ export default function Dashboard() {
                 </div>
             )}
 
+            {/* Mobile Scroll Hint */}
+            <div className="md:hidden flex items-center justify-center gap-2 mb-2 text-[10px] font-mono opacity-40 animate-pulse">
+                <span>← SCROLL TABLE TO VIEW MORE DATA →</span>
+            </div>
+
             {/* Table */}
             <div className="overflow-x-auto -mx-4 md:mx-0">
                 <div className="inline-block min-w-full align-middle">
@@ -347,16 +406,17 @@ export default function Dashboard() {
                                     </th>
                                     <th className="text-center p-2 w-10">⬍</th>
                                     <th
-                                        className="text-right p-2 min-w-[80px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('price_change')}
                                     >
-                                        {timeframe}% <SortIcon columnKey="price_change" />
+                                        PRICE % <SortIcon columnKey="price_change" />
                                     </th>
+                                    <th className="text-center p-2 opacity-50 font-mono text-[10px] uppercase">Trend</th>
                                     <th
-                                        className="text-right p-2 min-w-[90px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('market_cap')}
                                     >
-                                        MCAP <SortIcon columnKey="market_cap" />
+                                        MKT CAP <SortIcon columnKey="market_cap" />
                                     </th>
                                     <th
                                         className="text-right p-2 min-w-[70px] cursor-pointer hover:bg-green-darker select-none transition-colors"
@@ -445,6 +505,9 @@ export default function Dashboard() {
                                             </td>
                                             <td className={`p-2 text-right font-mono text-sm ${token.price_change < 0 ? 'text-red' : 'text-green'}`}>
                                                 {token.price_change >= 0 ? '+' : ''}{token.price_change.toFixed(2)}%
+                                            </td>
+                                            <td className="p-2">
+                                                <Sparkline data={token.price_history || []} />
                                             </td>
                                             <td className="p-2 text-right font-mono opacity-90 text-sm">
                                                 ${formatNumber(token.market_cap)}
