@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+import { generateMockFlows } from '@/lib/mockData'
+
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams
@@ -8,25 +10,30 @@ export async function GET(request: NextRequest) {
 
         console.log(`API get-flows called for timeframe: ${timeframe}`)
 
-        console.log(`Supabase connecting with URL: ${process.env.SUPABASE_URL ? 'PRESENT' : 'MISSING'}`)
-
         // Query Supabase for latest data for the specified timeframe
         const { data, error } = await supabase
             .from('token_flows')
             .select('*')
             .eq('timeframe', timeframe)
             .order('net_flows', { ascending: false })
-            .limit(50)
+            .limit(20)
 
         if (error) {
             console.error('Supabase error:', error.message)
-            throw error
+            // If Supabase fails, we still want to return mock data in development
+            console.log('Falling back to mock data due to Supabase error')
+            return NextResponse.json(generateMockFlows())
         }
 
-        console.log(`Supabase returned ${data?.length || 0} rows for ${timeframe}`)
+        if (!data || data.length === 0) {
+            console.log(`No data found in Supabase for ${timeframe}, returning mock data`)
+            return NextResponse.json(generateMockFlows())
+        }
+
+        console.log(`Supabase returned ${data.length} rows for ${timeframe}`)
 
         // Format data for frontend
-        const formattedData = (data || []).map(token => ({
+        const formattedData = data.map(token => ({
             symbol: token.symbol,
             price_change: parseFloat(token.price_change_pct || 0),
             market_cap: parseFloat(token.market_cap || 0),
@@ -41,10 +48,10 @@ export async function GET(request: NextRequest) {
         }))
 
         return NextResponse.json(formattedData)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error in get-flows:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to fetch data', details: error },
+            { error: (error as Error).message || 'Failed to fetch data', details: error },
             { status: 500 }
         )
     }

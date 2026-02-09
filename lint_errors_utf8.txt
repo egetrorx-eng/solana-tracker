@@ -1,0 +1,50 @@
+﻿
+> solana-smart-money-tracker@1.0.0 lint
+> next lint
+
+node.exe : `next lint` is 
+deprecated and will be 
+removed in Next.js 16.
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (`ne  
+  xt lint` is ... in Nex   
+ t.js 16.:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+For new projects, use 
+create-next-app to choose 
+your preferred linter.
+For existing projects, 
+migrate to the ESLint CLI:
+npx @next/codemod@canary 
+next-lint-to-eslint-cli .
+
+Converting circular 
+structure to JSON
+    --> starting at object 
+with constructor 'Object'
+    |     property 
+'configs' -> object with 
+constructor 'Object'
+    |     property 'flat' 
+-> object with constructor 
+'Object'
+    |     ...
+    |     property 
+'plugins' -> object with 
+constructor 'Object'
+    --- property 'react' 
+closes the circle
+Referenced from: C:\Users\S
+INISA\Desktop\nansen\.eslin
+trc.json

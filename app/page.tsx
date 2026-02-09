@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 const TIMEFRAMES = ['5MIN', '10MIN', '30MIN', '1H', '6H', '12H', '24H']
 
@@ -18,27 +18,54 @@ interface TokenData {
     token_sectors?: string[]
 }
 
-function formatNumber(num: number): string {
-    if (num >= 1000000) {
+function formatNumber(num: number | null | undefined): string {
+    if (num === null || num === undefined || isNaN(num)) {
+        return '---'
+    }
+    if (Math.abs(num) >= 1000000000) {
+        return (num / 1000000000).toFixed(2) + 'B'
+    }
+    if (Math.abs(num) >= 1000000) {
         return (num / 1000000).toFixed(2) + 'M'
-    } else if (num >= 1000) {
+    } else if (Math.abs(num) >= 1000) {
         return (num / 1000).toFixed(2) + 'K'
     } else {
         return num.toFixed(2)
     }
 }
 
+function FlowBar({ value, maxValue, isPositive }: { value: number; maxValue: number; isPositive: boolean }) {
+    const percentage = Math.min(Math.abs(value) / maxValue * 100, 100)
+    return (
+        <div className="w-full h-2 bg-green/10 rounded-full overflow-hidden">
+            <div
+                className={`h-full rounded-full transition-all ${isPositive ? 'bg-gradient-to-r from-green/50 to-green' : 'bg-gradient-to-r from-red/50 to-red'}`}
+                style={{ width: `${percentage}%` }}
+            />
+        </div>
+    )
+}
+
+function FlowArrow({ value }: { value: number }) {
+    if (value > 0) {
+        return <span className="text-green text-lg">▲</span>
+    } else if (value < 0) {
+        return <span className="text-red text-lg">▼</span>
+    }
+    return <span className="text-green/30">–</span>
+}
+
 export default function Dashboard() {
     const [timeframe, setTimeframe] = useState('5MIN')
     const [data, setData] = useState<TokenData[]>([])
     const [loading, setLoading] = useState(false)
-
     const [error, setError] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: keyof TokenData; direction: 'asc' | 'desc' } | null>({ key: 'net_flows', direction: 'desc' })
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+    const [countdown, setCountdown] = useState(30)
 
     const handleSort = (key: keyof TokenData) => {
-        let direction: 'asc' | 'desc' = 'desc' // Default to highest first
-        // If already sorting by this key and it's desc, toggle to asc (lowest first)
+        let direction: 'asc' | 'desc' = 'desc'
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
             direction = 'asc'
         }
@@ -47,7 +74,6 @@ export default function Dashboard() {
 
     const sortedData = [...data].sort((a, b) => {
         if (!sortConfig) return 0
-
         const { key, direction } = sortConfig
 
         if (key === 'token_sectors') {
@@ -62,23 +88,23 @@ export default function Dashboard() {
                 : (b[key] as string).localeCompare(a[key] as string)
         }
 
-        // Handle numeric sorting
         const valA = (a[key] as number) || 0
         const valB = (b[key] as number) || 0
-
         return direction === 'asc' ? valA - valB : valB - valA
     })
+
+    const maxNetFlow = Math.max(...data.map(t => Math.abs(t.net_flows)), 1)
 
     const SortIcon = ({ columnKey }: { columnKey: keyof TokenData }) => {
         if (sortConfig?.key !== columnKey) return <span className="text-green/20 ml-1">[-]</span>
         return (
             <span className="ml-1 text-green font-bold animate-pulse">
-                {sortConfig.direction === 'asc' ? '[LOWEST]' : '[HIGHEST]'}
+                {sortConfig.direction === 'asc' ? '[↑]' : '[↓]'}
             </span>
         )
     }
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true)
         setError(null)
         try {
@@ -90,47 +116,89 @@ export default function Dashboard() {
             }
 
             setData(json)
-        } catch (error: any) {
+            setLastUpdated(new Date())
+            setCountdown(30)
+        } catch (error: unknown) {
             console.error('Error fetching data:', error)
-            setError(error.message)
+            setError((error as Error).message)
             setData([])
         }
         setLoading(false)
-    }
+    }, [timeframe])
 
     useEffect(() => {
         fetchData()
-        const interval = setInterval(fetchData, 30000) // auto-refresh every 30s
+        const interval = setInterval(fetchData, 30000)
         return () => clearInterval(interval)
-    }, [timeframe])
+    }, [fetchData])
+
+    // Countdown timer
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCountdown(prev => (prev > 0 ? prev - 1 : 30))
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [])
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement) return
+            const num = parseInt(e.key)
+            if (num >= 1 && num <= 7) {
+                setTimeframe(TIMEFRAMES[num - 1])
+            }
+            if (e.key === 'r' || e.key === 'R') {
+                fetchData()
+            }
+        }
+        window.addEventListener('keydown', handleKeyPress)
+        return () => window.removeEventListener('keydown', handleKeyPress)
+    }, [fetchData])
 
     return (
         <div className="min-h-screen bg-black text-green p-4 md:p-8 relative overflow-hidden crt-flicker">
-            {/* Scanlines Overlay */}
             <div className="scanlines" />
 
             {/* Header */}
-            <div className="mb-8 relative z-20">
-                <h1 className="text-2xl md:text-4xl font-bold mb-2 tracking-tighter glow-text uppercase italic">
-                    SOLANA MICROCAP SMART MONEY TRACKER
-                </h1>
-                <div className="flex items-center gap-4 text-xs font-mono">
-                    <p className="opacity-80">
-                        SOURCE: <a
-                            href="https://nsn.ai/gamefi?utm_source=tracker"
-                            className="underline hover:glow-text transition-all"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            NANSEN_INTELLIGENCE_API
-                        </a>
-                    </p>
+            <div className="mb-6 relative z-20">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl md:text-4xl font-bold mb-1 tracking-tighter glow-text uppercase italic">
+                            SOLANA MICROCAP SMART MONEY TRACKER
+                        </h1>
+                        <div className="flex items-center gap-4 text-xs font-mono">
+                            <p className="opacity-80">
+                                SOURCE: <a
+                                    href="https://nsn.ai/gamefi?utm_source=tracker"
+                                    className="underline hover:glow-text transition-all"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    NANSEN_INTELLIGENCE_API
+                                </a>
+                            </p>
+                            <span className="opacity-50">|</span>
+                            <span className="text-green/60">TRACKING {data.length} TOKENS</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-mono">
+                        {lastUpdated && (
+                            <span className="opacity-50">
+                                UPDATED: {lastUpdated.toLocaleTimeString()}
+                            </span>
+                        )}
+                        <div className="flex items-center gap-2 px-3 py-1 bg-green/5 border border-green/20 rounded">
+                            <div className={`w-2 h-2 rounded-full ${countdown <= 5 ? 'bg-yellow-500 animate-pulse' : 'bg-green/50'}`} />
+                            <span className="tabular-nums">REFRESH: {countdown}s</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {/* Timeframe Buttons */}
             <div className="flex flex-wrap gap-2 mb-6">
-                {TIMEFRAMES.map(tf => (
+                {TIMEFRAMES.map((tf, idx) => (
                     <button
                         key={tf}
                         onClick={() => setTimeframe(tf)}
@@ -138,22 +206,27 @@ export default function Dashboard() {
                             ? 'bg-green text-black border-green font-bold'
                             : 'border-green text-green hover:bg-green-darker'
                             }`}
+                        title={`Press ${idx + 1} for ${tf}`}
                     >
-                        {tf}
+                        <span className="opacity-40 mr-1">{idx + 1}:</span>{tf}
                     </button>
                 ))}
                 <button
                     onClick={fetchData}
                     className="px-4 py-2 border border-green text-green hover:bg-green-darker transition-all font-mono"
+                    title="Press R to refresh"
                 >
-                    REFRESH
+                    <span className="opacity-40 mr-1">R:</span>REFRESH
                 </button>
             </div>
 
             {/* Loading Indicator */}
             {loading && (
-                <div className="text-center py-4 text-green animate-pulse">
-                    Loading data...
+                <div className="fixed top-4 right-4 z-50">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-green/10 border border-green/30 rounded-full backdrop-blur-sm">
+                        <div className="w-2 h-2 bg-green rounded-full animate-pulse" />
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-green">Syncing Data</span>
+                    </div>
                 </div>
             )}
 
@@ -164,117 +237,134 @@ export default function Dashboard() {
                         <table className="min-w-full border-collapse">
                             <thead>
                                 <tr className="border-b border-green-dark">
-                                    <th className="text-left p-3 w-12 font-mono opacity-50">
-                                        #
-                                    </th>
+                                    <th className="text-left p-2 w-10 font-mono opacity-50">#</th>
                                     <th
-                                        className="text-left p-3 sticky left-0 bg-black z-10 min-w-[80px] cursor-pointer hover:text-green select-none"
+                                        className="text-left p-2 sticky left-0 bg-black z-10 min-w-[70px] cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('symbol')}
                                     >
                                         SYMBOL <SortIcon columnKey="symbol" />
                                     </th>
+                                    <th className="text-center p-2 w-10">⬍</th>
                                     <th
-                                        className="text-right p-3 min-w-[100px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 min-w-[80px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('price_change')}
                                     >
-                                        {timeframe} % <div className="text-[10px]"><SortIcon columnKey="price_change" /></div>
+                                        {timeframe}% <SortIcon columnKey="price_change" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 min-w-[90px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('market_cap')}
                                     >
-                                        MARKETCAP <div className="text-[10px]"><SortIcon columnKey="market_cap" /></div>
+                                        MCAP <SortIcon columnKey="market_cap" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 min-w-[70px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('smart_wallets')}
                                     >
-                                        SM WALLETS <div className="text-[10px]"><SortIcon columnKey="smart_wallets" /></div>
+                                        SM$ <SortIcon columnKey="smart_wallets" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 min-w-[80px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('volume')}
                                     >
-                                        VOLUMES <div className="text-[10px]"><SortIcon columnKey="volume" /></div>
+                                        VOL <SortIcon columnKey="volume" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 min-w-[80px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('liquidity')}
                                     >
-                                        LIQUIDITY <div className="text-[10px]"><SortIcon columnKey="liquidity" /></div>
+                                        LIQ <SortIcon columnKey="liquidity" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        className="text-right p-2 min-w-[70px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        onClick={() => handleSort('inflows')}
+                                    >
+                                        IN <SortIcon columnKey="inflows" />
+                                    </th>
+                                    <th
+                                        className="text-right p-2 min-w-[70px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        onClick={() => handleSort('outflows')}
+                                    >
+                                        OUT <SortIcon columnKey="outflows" />
+                                    </th>
+                                    <th
+                                        className="text-right p-2 min-w-[50px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('token_age')}
                                     >
-                                        AGE <div className="text-[10px]"><SortIcon columnKey="token_age" /></div>
+                                        AGE <SortIcon columnKey="token_age" />
                                     </th>
                                     <th
-                                        className="text-left p-3 min-w-[150px] cursor-pointer hover:bg-green-darker select-none transition-colors"
-                                        onClick={() => handleSort('token_sectors' as any)}
-                                    >
-                                        SECTORS <div className="text-[10px]"><SortIcon columnKey="token_sectors" /></div>
-                                    </th>
-                                    <th
-                                        className="text-right p-3 min-w-[300px] cursor-pointer hover:bg-green-darker border-l border-green-dark select-none transition-colors"
+                                        className="text-right p-2 min-w-[180px] cursor-pointer hover:bg-green-darker border-l border-green-dark select-none transition-colors"
                                         onClick={() => handleSort('net_flows')}
                                     >
-                                        NET FLOWS <div className="text-[10px]"><SortIcon columnKey="net_flows" /></div>
+                                        NET FLOWS <SortIcon columnKey="net_flows" />
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {sortedData.length === 0 && !loading ? (
                                     <tr>
-                                        <td colSpan={9} className="text-center py-8 text-green opacity-60">
-                                            {error ? (
-                                                <span className="text-red">Error: {error}</span>
-                                            ) : (
-                                                "No data available. Click REFRESH to load data."
-                                            )}
+                                        <td colSpan={12} className="text-center py-20">
+                                            <div className="flex flex-col items-center justify-center gap-4">
+                                                <div className="text-green/20 text-4xl font-mono">[!]</div>
+                                                <p className="text-green/60 font-mono tracking-widest uppercase">
+                                                    {error ? `System Error: ${error}` : "No spectral data detected in this timeframe"}
+                                                </p>
+                                                <button
+                                                    onClick={fetchData}
+                                                    className="mt-2 px-6 py-2 border border-green/30 text-green/60 hover:bg-green hover:text-black transition-all font-mono text-xs"
+                                                >
+                                                    RETRY SYSTEM SCAN
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ) : (
                                     sortedData.map((token, idx) => (
                                         <tr
                                             key={`${token.symbol}-${idx}`}
-                                            className="border-b border-green-dark/30 hover:bg-green-darker transition-colors"
+                                            className="border-b border-green-dark/30 hover:bg-green-darker transition-colors group"
                                         >
-                                            <td className="p-3 text-left font-mono opacity-50">
+                                            <td className="p-2 text-left font-mono opacity-50 text-xs">
                                                 {idx + 1}
                                             </td>
-                                            <td className="p-3 sticky left-0 bg-black z-10 font-bold">
+                                            <td className="p-2 sticky left-0 bg-black z-10 font-bold group-hover:glow-text transition-all">
                                                 {token.symbol}
                                             </td>
-                                            <td className={`p-3 text-right font-mono ${token.price_change < 0 ? 'text-red glow-text-red' : 'text-green glow-text'}`}>
-                                                {token.price_change.toFixed(2)}%
+                                            <td className="p-2 text-center">
+                                                <FlowArrow value={token.net_flows} />
                                             </td>
-                                            <td className="p-3 text-right font-mono opacity-90">
+                                            <td className={`p-2 text-right font-mono text-sm ${token.price_change < 0 ? 'text-red' : 'text-green'}`}>
+                                                {token.price_change >= 0 ? '+' : ''}{token.price_change.toFixed(2)}%
+                                            </td>
+                                            <td className="p-2 text-right font-mono opacity-90 text-sm">
                                                 ${formatNumber(token.market_cap)}
                                             </td>
-                                            <td className="p-3 text-right font-mono text-green/80">
+                                            <td className="p-2 text-right font-mono text-green/80 text-sm">
                                                 {token.smart_wallets}
                                             </td>
-                                            <td className="p-3 text-right font-mono opacity-80">
+                                            <td className="p-2 text-right font-mono opacity-80 text-sm">
                                                 ${formatNumber(token.volume)}
                                             </td>
-                                            <td className="p-3 text-right font-mono opacity-80">
+                                            <td className="p-2 text-right font-mono opacity-80 text-sm">
                                                 ${formatNumber(token.liquidity)}
                                             </td>
-                                            <td className="p-3 text-right font-mono opacity-80">
+                                            <td className="p-2 text-right font-mono text-green text-sm">
+                                                +${formatNumber(token.inflows)}
+                                            </td>
+                                            <td className="p-2 text-right font-mono text-red text-sm">
+                                                -${formatNumber(token.outflows)}
+                                            </td>
+                                            <td className="p-2 text-right font-mono opacity-80 text-sm">
                                                 {token.token_age || 0}d
                                             </td>
-                                            <td className="p-3 text-left font-mono text-[11px] opacity-70">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {(token.token_sectors || []).slice(0, 2).map((s, i) => (
-                                                        <span key={i} className="px-1 border border-green/30 rounded">
-                                                            {s}
-                                                        </span>
-                                                    )) || 'n/a'}
+                                            <td className={`p-2 text-right font-bold font-mono border-l border-green-dark/30`}>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className={`${token.net_flows < 0 ? 'text-red' : 'text-green'}`}>
+                                                        {token.net_flows >= 0 ? '+' : ''}${formatNumber(token.net_flows)}
+                                                    </span>
+                                                    <FlowBar value={token.net_flows} maxValue={maxNetFlow} isPositive={token.net_flows >= 0} />
                                                 </div>
-                                            </td>
-                                            <td className={`p-3 text-right font-bold font-mono ${token.net_flows < 0 ? 'text-red glow-text-red' : 'text-green glow-text'}`}>
-                                                ${formatNumber(token.net_flows)}
                                             </td>
                                         </tr>
                                     ))
@@ -283,6 +373,11 @@ export default function Dashboard() {
                         </table>
                     </div>
                 </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-8 pt-4 border-t border-green-dark/30 text-center text-xs font-mono opacity-40">
+                <p>KEYBOARD: 1-7 for timeframes | R to refresh | Data updates every 30 seconds</p>
             </div>
         </div>
     )

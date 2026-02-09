@@ -56,7 +56,7 @@ const myHandler: Handler = async () => {
                 },
                 body: JSON.stringify({
                     chains: ['solana'],
-                    pagination: { page: 1, per_page: 50 },
+                    pagination: { page: 1, per_page: 20 },
                     order_by: [{ direction: 'DESC', field: 'net_flow_24h_usd' }]
                 })
             }

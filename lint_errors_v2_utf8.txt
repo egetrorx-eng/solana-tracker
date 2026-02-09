@@ -1,0 +1,81 @@
+﻿
+> solana-smart-money-tracker@1.0.0 lint
+> next lint
+
+node.exe : `next 
+lint` is deprecated 
+and will be removed 
+in Next.js 16.
+At line:1 char:1
++ & "C:\Program File
+s\nodejs/node.exe" 
+"C:\Program Files\no
+dejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo  
+            : NotS  
+  pecified: (`nex   
+ t lint` is ...     
+in Next.js 16.:    
+String) [], Rem    
+oteException
+    + FullyQualifie 
+   dErrorId : Nati  
+  veCommandError
+ 
+For new projects, 
+use create-next-app 
+to choose your 
+preferred linter.
+For existing 
+projects, migrate 
+to the ESLint CLI:
+npx @next/codemod@ca
+nary next-lint-to-es
+lint-cli .
+
+
+./app/api/get-flows/
+route.ts
+51:21  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-e
+slint/no-explicit-an
+y
+
+./app/page.tsx
+96:25  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-e
+slint/no-explicit-an
+y
+108:8  Warning: 
+React Hook 
+useEffect has a 
+missing dependency: 
+'fetchData'. Either 
+include it or 
+remove the 
+dependency array.  r
+eact-hooks/exhaustiv
+e-deps
+
+./lib/mockData.ts
+3:35  Error: 
+'timeframe' is 
+defined but never 
+used.  @typescript-e
+slint/no-unused-vars
+
+info  - Need to 
+disable some ESLint 
+rules? Learn more 
+here: https://nextjs
+.org/docs/app/api-re
+ference/config/eslin
+t#disabling-rules
