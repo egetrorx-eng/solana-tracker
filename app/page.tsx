@@ -112,13 +112,9 @@ export default function Dashboard() {
             {/* Header */}
             <div className="mb-8 relative z-20">
                 <h1 className="text-2xl md:text-4xl font-bold mb-2 tracking-tighter glow-text uppercase italic">
-                    <span className="opacity-50 mr-2">[SYS_MSG]</span>
                     SOLANA MICROCAP SMART MONEY TRACKER
                 </h1>
                 <div className="flex items-center gap-4 text-xs font-mono">
-                    <p className="opacity-80">
-                        STATUS: <span className="text-green animate-pulse">CONNECTED_TO_SUPABASE</span>
-                    </p>
                     <p className="opacity-80">
                         SOURCE: <a
                             href="https://nsn.ai/gamefi?utm_source=tracker"
