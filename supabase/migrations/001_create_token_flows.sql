@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS token_flows (
   inflows DECIMAL(15,2),
   outflows DECIMAL(15,2),
   net_flows DECIMAL(15,2),
+  token_age INTEGER,
+  token_sectors TEXT[],
   fetched_at TIMESTAMPTZ DEFAULT NOW()
 );
 

@@ -18,29 +18,9 @@ interface NansenToken {
 
 // This function would fetch data from Nansen API
 async function fetchNansenData(timeframe: string): Promise<NansenToken[]> {
-    try {
-        // Note: This is a placeholder. Replace with actual Nansen API endpoint
-        // Example: https://api.nansen.ai/v1/solana/tokens?marketCapMax=5000000&timeframe=${timeframe}
-        const response = await fetch(
-            `https://api.nansen.ai/v1/solana/smart-money?marketCapMax=5000000&timeframe=${timeframe}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${NANSEN_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-            }
-        )
-
-        if (!response.ok) {
-            throw new Error(`Nansen API error: ${response.status}`)
-        }
-
-        const data = await response.json()
-        return data.tokens || []
-    } catch (error) {
-        console.error(`Error fetching Nansen data for ${timeframe}:`, error)
-        throw error
-    }
+    // This function is no longer used in the updated handler, but keeping its signature for now.
+    // The actual fetching and upsert logic is moved directly into the handler.
+    return []
 }
 
 // Generate mock data for development/testing
@@ -65,38 +45,92 @@ const myHandler: Handler = async () => {
     console.log('Starting scheduled update-flows function...')
 
     try {
-        // Fetch data for all timeframes
-        for (const timeframe of TIMEFRAMES) {
-            console.log(`Fetching data for timeframe: ${timeframe}`)
+        // Fetch from Nansen Smart Money Netflow API
+        const nansenResponse = await fetch(
+            `https://api.nansen.ai/api/v1/smart-money/netflow`,
+            {
+                method: 'POST',
+                headers: {
+                    'apiKey': NANSEN_API_KEY,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    chains: ['solana'],
+                    pagination: { page: 1, per_page: 50 },
+                    order_by: [{ direction: 'DESC', field: 'net_flow_24h_usd' }]
+                })
+            }
+        )
 
-            const tokens = await fetchNansenData(timeframe)
+        if (!nansenResponse.ok) {
+            const errorText = await nansenResponse.text()
+            throw new Error(`Nansen API error (${nansenResponse.status}): ${errorText}`)
+        }
 
-            // Insert data into Supabase
-            for (const token of tokens) {
-                const netFlows = (token.smartMoneyInflows || 0) - (token.smartMoneyOutflows || 0)
+        const json = await nansenResponse.json()
+        const nansenTokens = json.data || []
 
-                const { error } = await supabase
-                    .from('token_flows')
-                    .insert({
-                        symbol: token.symbol,
-                        mint_address: token.mintAddress,
-                        timeframe: timeframe,
-                        price_change_pct: token.price24hChange || 0,
-                        market_cap: token.marketCap,
-                        smart_wallet_count: token.smartWalletCount || 0,
-                        volume: token.volume || 0,
-                        liquidity: token.liquidity || 0,
-                        inflows: token.smartMoneyInflows || 0,
-                        outflows: token.smartMoneyOutflows || 0,
-                        net_flows: netFlows,
+        console.log(`Fetched ${nansenTokens.length} tokens from Nansen for 24h`)
+
+        // Enrich with DexScreener data
+        const addresses = nansenTokens.map((t: any) => t.token_address).filter(Boolean)
+        let dexMap = new Map()
+
+        if (addresses.length > 0) {
+            try {
+                const dexResponse = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addresses.join(',')}`)
+                if (dexResponse.ok) {
+                    const dexJson: any = await dexResponse.json()
+                    const dexPairs = dexJson.pairs || []
+                    dexPairs.forEach((pair: any) => {
+                        const existing = dexMap.get(pair.baseToken.address)
+                        if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
+                            dexMap.set(pair.baseToken.address, pair)
+                        }
                     })
+                }
+            } catch (e) {
+                console.error('DexScreener enrich error:', e)
+            }
+        }
+
+        // Update Supabase with enriched data for 7 timeframes
+        const dbTimeframes = [
+            { db: '5min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
+            { db: '10min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
+            { db: '30min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
+            { db: '1h', dexKey: 'h1', nansenFlowKey: 'net_flow_1h_usd' },
+            { db: '6h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
+            { db: '12h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
+            { db: '24h', dexKey: 'h24', nansenFlowKey: 'net_flow_24h_usd' }
+        ]
+
+        for (const token of nansenTokens) {
+            const dexData = dexMap.get(token.token_address)
+
+            for (const map of dbTimeframes) {
+                const volumeValue = dexData?.volume?.[map.dexKey] || (map.dexKey === 'm5' ? 0 : dexData?.volume?.h24) || 0
+
+                const { error } = await supabase.from('token_flows').upsert({
+                    symbol: token.token_symbol,
+                    timeframe: map.db,
+                    price_change_pct: dexData?.priceChange?.[map.dexKey] || 0,
+                    market_cap: token.market_cap_usd || dexData?.fdv || 0,
+                    smart_wallet_count: token.trader_count || 0,
+                    volume: volumeValue,
+                    liquidity: dexData?.liquidity?.usd || 0,
+                    inflows: 0,
+                    outflows: 0,
+                    net_flows: token[map.nansenFlowKey] || 0,
+                    token_age: token.token_age_days || 0,
+                    token_sectors: token.token_sectors || [],
+                    fetched_at: new Date().toISOString()
+                }, { onConflict: 'symbol,timeframe' })
 
                 if (error) {
-                    console.error(`Error inserting ${token.symbol}:`, error)
+                    console.error(`Error upserting ${token.token_symbol} for ${map.db}:`, error)
                 }
             }
-
-            console.log(`Inserted ${tokens.length} tokens for ${timeframe}`)
         }
 
         // Delete data older than 24 hours

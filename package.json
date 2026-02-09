@@ -10,20 +10,22 @@
     "populate-mock": "tsx scripts/populate-mock-data.ts"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "@supabase/supabase-js": "^2.39.3",
     "next": "^15.1.0",
-    "@supabase/supabase-js": "^2.39.3"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@netlify/functions": "^2.4.1",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8.4.33",
     "autoprefixer": "^10.4.17",
-    "@netlify/functions": "^2.4.1",
-    "tsx": "^4.7.0"
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.1.6",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
   }
 }

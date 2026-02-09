@@ -11,6 +11,8 @@ export interface TokenFlow {
     inflows: number
     outflows: number
     net_flows: number
+    token_age?: number
+    token_sectors?: string[]
     fetched_at?: Date
 }
 

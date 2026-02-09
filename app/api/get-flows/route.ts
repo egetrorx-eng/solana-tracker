@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
             inflows: parseFloat(token.inflows || 0),
             outflows: parseFloat(token.outflows || 0),
             net_flows: parseFloat(token.net_flows || 0),
+            token_age: token.token_age || 0,
+            token_sectors: token.token_sectors || [],
         }))
 
         return NextResponse.json(formattedData)

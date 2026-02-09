@@ -14,6 +14,8 @@ interface TokenData {
     inflows: number
     outflows: number
     net_flows: number
+    token_age?: number
+    token_sectors?: string[]
 }
 
 function formatNumber(num: number): string {
@@ -35,7 +37,8 @@ export default function Dashboard() {
     const [sortConfig, setSortConfig] = useState<{ key: keyof TokenData; direction: 'asc' | 'desc' } | null>({ key: 'net_flows', direction: 'desc' })
 
     const handleSort = (key: keyof TokenData) => {
-        let direction: 'asc' | 'desc' = 'desc'
+        let direction: 'asc' | 'desc' = 'desc' // Default to highest first
+        // If already sorting by this key and it's desc, toggle to asc (lowest first)
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
             direction = 'asc'
         }
@@ -47,6 +50,12 @@ export default function Dashboard() {
 
         const { key, direction } = sortConfig
 
+        if (key === 'token_sectors') {
+            const valA = (a[key] as string[])?.[0] || ''
+            const valB = (b[key] as string[])?.[0] || ''
+            return direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA)
+        }
+
         if (typeof a[key] === 'string' && typeof b[key] === 'string') {
             return direction === 'asc'
                 ? (a[key] as string).localeCompare(b[key] as string)
@@ -54,15 +63,19 @@ export default function Dashboard() {
         }
 
         // Handle numeric sorting
-        const valA = a[key] as number
-        const valB = b[key] as number
+        const valA = (a[key] as number) || 0
+        const valB = (b[key] as number) || 0
 
         return direction === 'asc' ? valA - valB : valB - valA
     })
 
     const SortIcon = ({ columnKey }: { columnKey: keyof TokenData }) => {
-        if (sortConfig?.key !== columnKey) return <span className="text-gray-600 ml-1">↕</span>
-        return <span className="ml-1 text-green">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+        if (sortConfig?.key !== columnKey) return <span className="text-green/20 ml-1">[-]</span>
+        return (
+            <span className="ml-1 text-green font-bold animate-pulse">
+                {sortConfig.direction === 'asc' ? '[LOWEST]' : '[HIGHEST]'}
+            </span>
+        )
     }
 
     const fetchData = async () => {
@@ -92,23 +105,31 @@ export default function Dashboard() {
     }, [timeframe])
 
     return (
-        <div className="min-h-screen bg-black text-green p-4 md:p-8">
+        <div className="min-h-screen bg-black text-green p-4 md:p-8 relative overflow-hidden crt-flicker">
+            {/* Scanlines Overlay */}
+            <div className="scanlines" />
+
             {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-2xl md:text-3xl font-bold mb-2 tracking-wide">
+            <div className="mb-8 relative z-20">
+                <h1 className="text-2xl md:text-4xl font-bold mb-2 tracking-tighter glow-text uppercase italic">
+                    <span className="opacity-50 mr-2">[SYS_MSG]</span>
                     SOLANA MICROCAP SMART MONEY TRACKER
                 </h1>
-                <p className="text-sm opacity-80">
-                    Powered by{' '}
-                    <a
-                        href="https://nsn.ai/gamefi?utm_source=tracker"
-                        className="underline hover:text-green transition-colors"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        NANSEN
-                    </a>
-                </p>
+                <div className="flex items-center gap-4 text-xs font-mono">
+                    <p className="opacity-80">
+                        STATUS: <span className="text-green animate-pulse">CONNECTED_TO_SUPABASE</span>
+                    </p>
+                    <p className="opacity-80">
+                        SOURCE: <a
+                            href="https://nsn.ai/gamefi?utm_source=tracker"
+                            className="underline hover:glow-text transition-all"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            NANSEN_INTELLIGENCE_API
+                        </a>
+                    </p>
+                </div>
             </div>
 
             {/* Timeframe Buttons */}
@@ -157,52 +178,52 @@ export default function Dashboard() {
                                         SYMBOL <SortIcon columnKey="symbol" />
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[100px] cursor-pointer hover:text-green select-none"
+                                        className="text-right p-3 min-w-[100px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('price_change')}
                                     >
-                                        {timeframe} % <SortIcon columnKey="price_change" />
+                                        {timeframe} % <div className="text-[10px]"><SortIcon columnKey="price_change" /></div>
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:text-green select-none"
+                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('market_cap')}
                                     >
-                                        MARKETCAP <SortIcon columnKey="market_cap" />
+                                        MARKETCAP <div className="text-[10px]"><SortIcon columnKey="market_cap" /></div>
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('smart_wallets')}
                                     >
-                                        SM WALLETS <SortIcon columnKey="smart_wallets" />
+                                        SM WALLETS <div className="text-[10px]"><SortIcon columnKey="smart_wallets" /></div>
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('volume')}
                                     >
-                                        VOLUMES <SortIcon columnKey="volume" />
+                                        VOLUMES <div className="text-[10px]"><SortIcon columnKey="volume" /></div>
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('liquidity')}
                                     >
-                                        LIQUIDITY <SortIcon columnKey="liquidity" />
+                                        LIQUIDITY <div className="text-[10px]"><SortIcon columnKey="liquidity" /></div>
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
-                                        onClick={() => handleSort('inflows')}
+                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        onClick={() => handleSort('token_age')}
                                     >
-                                        INFLOWS <SortIcon columnKey="inflows" />
+                                        AGE <div className="text-[10px]"><SortIcon columnKey="token_age" /></div>
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[110px] cursor-pointer hover:text-green select-none"
-                                        onClick={() => handleSort('outflows')}
+                                        className="text-left p-3 min-w-[150px] cursor-pointer hover:bg-green-darker select-none transition-colors"
+                                        onClick={() => handleSort('token_sectors' as any)}
                                     >
-                                        OUTFLOWS <SortIcon columnKey="outflows" />
+                                        SECTORS <div className="text-[10px]"><SortIcon columnKey="token_sectors" /></div>
                                     </th>
                                     <th
-                                        className="text-right p-3 min-w-[120px] cursor-pointer hover:text-green select-none"
+                                        className="text-right p-3 min-w-[300px] cursor-pointer hover:bg-green-darker border-l border-green-dark select-none transition-colors"
                                         onClick={() => handleSort('net_flows')}
                                     >
-                                        NET FLOWS <SortIcon columnKey="net_flows" />
+                                        NET FLOWS <div className="text-[10px]"><SortIcon columnKey="net_flows" /></div>
                                     </th>
                                 </tr>
                             </thead>
@@ -229,28 +250,34 @@ export default function Dashboard() {
                                             <td className="p-3 sticky left-0 bg-black z-10 font-bold">
                                                 {token.symbol}
                                             </td>
-                                            <td className={`p-3 text-right font-mono ${token.price_change < 0 ? 'text-red' : 'text-green'}`}>
+                                            <td className={`p-3 text-right font-mono ${token.price_change < 0 ? 'text-red glow-text-red' : 'text-green glow-text'}`}>
                                                 {token.price_change.toFixed(2)}%
                                             </td>
-                                            <td className="p-3 text-right font-mono">
+                                            <td className="p-3 text-right font-mono opacity-90">
                                                 ${formatNumber(token.market_cap)}
                                             </td>
-                                            <td className="p-3 text-right font-mono">
+                                            <td className="p-3 text-right font-mono text-green/80">
                                                 {token.smart_wallets}
                                             </td>
-                                            <td className="p-3 text-right font-mono">
+                                            <td className="p-3 text-right font-mono opacity-80">
                                                 ${formatNumber(token.volume)}
                                             </td>
-                                            <td className="p-3 text-right font-mono">
+                                            <td className="p-3 text-right font-mono opacity-80">
                                                 ${formatNumber(token.liquidity)}
                                             </td>
-                                            <td className="p-3 text-right text-green font-mono">
-                                                ${formatNumber(token.inflows)}
+                                            <td className="p-3 text-right font-mono opacity-80">
+                                                {token.token_age || 0}d
                                             </td>
-                                            <td className="p-3 text-right text-red font-mono">
-                                                ${formatNumber(token.outflows)}
+                                            <td className="p-3 text-left font-mono text-[11px] opacity-70">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {(token.token_sectors || []).slice(0, 2).map((s, i) => (
+                                                        <span key={i} className="px-1 border border-green/30 rounded">
+                                                            {s}
+                                                        </span>
+                                                    )) || 'n/a'}
+                                                </div>
                                             </td>
-                                            <td className={`p-3 text-right font-bold font-mono ${token.net_flows < 0 ? 'text-red' : 'text-green'}`}>
+                                            <td className={`p-3 text-right font-bold font-mono ${token.net_flows < 0 ? 'text-red glow-text-red' : 'text-green glow-text'}`}>
                                                 ${formatNumber(token.net_flows)}
                                             </td>
                                         </tr>
