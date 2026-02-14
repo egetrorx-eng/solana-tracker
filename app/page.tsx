@@ -200,6 +200,26 @@ export default function Dashboard() {
 
     const maxNetFlow = Math.max(...data.map(t => Math.abs(t.net_flows)), 1)
 
+    // Sector Aggregation Logic
+    const sectorStats = uniqueSectors.map(sector => {
+        const sectorTokens = data.filter(t => t.token_sectors?.includes(sector))
+        const totalFlow = sectorTokens.reduce((acc, t) => acc + t.net_flows, 0)
+        const avgPriceChange = sectorTokens.length > 0
+            ? sectorTokens.reduce((acc, t) => acc + t.price_change, 0) / sectorTokens.length
+            : 0
+        const totalWallets = sectorTokens.reduce((acc, t) => acc + t.smart_wallets, 0)
+
+        return {
+            name: sector,
+            flow: totalFlow,
+            price: avgPriceChange,
+            wallets: totalWallets,
+            tokenCount: sectorTokens.length
+        }
+    }).sort((a, b) => b.flow - a.flow)
+
+    const maxSectorFlow = Math.max(...sectorStats.map(s => Math.abs(s.flow)), 1)
+
     const SortIcon = ({ columnKey }: { columnKey: keyof TokenData }) => {
         if (sortConfig?.key !== columnKey) return <span className="text-green/20 ml-1">[-]</span>
         return (
@@ -340,6 +360,42 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            {/* Sector Analytics Leaderboard */}
+            <div className="mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-20">
+                {sectorStats.slice(0, 4).map((s, idx) => (
+                    <div
+                        key={s.name}
+                        onClick={() => setSectorFilter(s.name)}
+                        className={`p-4 border border-green/20 bg-green/5 rounded group cursor-pointer hover:border-green/50 transition-all ${sectorFilter === s.name ? 'border-green/60 bg-green/10' : ''}`}
+                    >
+                        <div className="flex justify-between items-start mb-2">
+                            <span className="text-[10px] opacity-40 font-mono">SECTOR_0{idx + 1}</span>
+                            <span className={`text-[10px] font-mono font-bold ${s.price >= 0 ? 'text-green' : 'text-red'}`}>
+                                {s.price >= 0 ? '+' : ''}{s.price.toFixed(1)}%
+                            </span>
+                        </div>
+                        <h3 className="text-sm font-bold tracking-widest uppercase mb-1 flex items-center gap-2">
+                            {s.name}
+                            {idx === 0 && <span className="text-[10px] bg-green text-black px-1 rounded">HOT</span>}
+                        </h3>
+                        <div className="flex justify-between items-end">
+                            <div className="flex flex-col">
+                                <span className={`text-xs font-mono font-bold ${s.flow >= 0 ? 'text-green' : 'text-red'}`}>
+                                    {s.flow >= 0 ? '+' : ''}${formatNumber(s.flow)}
+                                </span>
+                                <span className="text-[10px] opacity-40 font-mono">{s.wallets} WALLETS</span>
+                            </div>
+                            <div className="w-20 h-1 bg-green/10 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full ${s.flow >= 0 ? 'bg-green' : 'bg-red'}`}
+                                    style={{ width: `${(Math.abs(s.flow) / maxSectorFlow) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
             {/* Timeframe Buttons */}
             <div className="flex flex-wrap gap-2 mb-6">
                 {TIMEFRAMES.map((tf, idx) => (
@@ -414,14 +470,16 @@ export default function Dashboard() {
             </div>
 
             {/* Loading Indicator */}
-            {loading && (
-                <div className="fixed top-4 right-4 z-50">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-green/10 border border-green/30 rounded-full backdrop-blur-sm">
-                        <div className="w-2 h-2 bg-green rounded-full animate-pulse" />
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-green">Syncing Data</span>
+            {
+                loading && (
+                    <div className="fixed top-4 right-4 z-50">
+                        <div className="flex items-center gap-2 px-3 py-1 bg-green/10 border border-green/30 rounded-full backdrop-blur-sm">
+                            <div className="w-2 h-2 bg-green rounded-full animate-pulse" />
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-green">Syncing Data</span>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Mobile Scroll Hint */}
             <div className="md:hidden flex items-center justify-center gap-2 mb-2 text-[10px] font-mono opacity-40 animate-pulse">
@@ -530,15 +588,22 @@ export default function Dashboard() {
                                                 {idx + 1}
                                             </td>
                                             <td className="p-2 sticky left-0 bg-black z-10 font-bold group-hover:glow-text transition-all">
-                                                <a
-                                                    href={`https://dexscreener.com/solana/${token.token_address || token.symbol}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="hover:underline hover:text-green transition-all"
-                                                    title="View on DexScreener"
-                                                >
-                                                    {token.symbol} ↗
-                                                </a>
+                                                <div className="flex flex-col">
+                                                    <a
+                                                        href={`https://dexscreener.com/solana/${token.token_address || token.symbol}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="hover:underline hover:text-green transition-all"
+                                                        title="View on DexScreener"
+                                                    >
+                                                        {token.symbol} ↗
+                                                    </a>
+                                                    {token.token_sectors && token.token_sectors.length > 0 && (
+                                                        <span className="text-[8px] opacity-30 font-mono uppercase tracking-tighter">
+                                                            {token.token_sectors[0]}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="p-2">
                                                 <SignalIndicator token={token} />
@@ -597,6 +662,6 @@ export default function Dashboard() {
             <div className="mt-8 pt-4 border-t border-green-dark/30 text-center text-xs font-mono opacity-40">
                 <p>KEYBOARD: 1-7 for timeframes | R to refresh | Data updates every 30 seconds</p>
             </div>
-        </div>
+        </div >
     )
 }
