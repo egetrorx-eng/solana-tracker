@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!data || data.length === 0) {
+            console.log('No data in Supabase, returning mock data')
             return NextResponse.json(generateMockFlows())
         }
 

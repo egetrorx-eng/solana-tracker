@@ -1,7 +1,7 @@
 import { Handler, schedule } from '@netlify/functions'
 import { supabase } from '../../lib/supabase'
 
-const NANSEN_API_KEY = process.env.NANSEN_API_KEY || ''
+const NANSEN_API_KEY = process.env.NANSEN_API_KEY || 'LMKwN29RPgiy5oBJVDqaC9OXeJjBdNgd'
 const TIMEFRAMES = ['5min', '10min', '30min', '1h', '6h', '12h', '24h']
 
 interface NansenToken {
