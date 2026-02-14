@@ -18,6 +18,7 @@ interface TokenData {
     token_age?: number
     token_sectors?: string[]
     price_history?: number[]
+    wallet_history?: number[]
 }
 
 const MARKET_CAP_FILTERS = [
@@ -102,6 +103,43 @@ function Sparkline({ data }: { data: number[] }) {
                     className="drop-shadow-[0_0_2px_rgba(0,255,65,0.5)]"
                 />
             </svg>
+        </div>
+    )
+}
+
+function SignalIndicator({ token }: { token: TokenData }) {
+    const isAccumulating = token.net_flows > 0 &&
+        token.wallet_history &&
+        token.wallet_history.length >= 2 &&
+        token.wallet_history[token.wallet_history.length - 1] > token.wallet_history[0]
+
+    const isDistributing = token.net_flows < 0 &&
+        token.wallet_history &&
+        token.wallet_history.length >= 2 &&
+        token.wallet_history[token.wallet_history.length - 1] < token.wallet_history[0]
+
+    if (isAccumulating) {
+        return (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green/10 border border-green/30 rounded text-[10px] font-bold text-green animate-pulse">
+                <div className="w-1.5 h-1.5 bg-green rounded-full shadow-[0_0_5px_rgba(0,255,65,0.8)]" />
+                ACCUMULATING
+            </div>
+        )
+    }
+
+    if (isDistributing) {
+        return (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-red/10 border border-red/30 rounded text-[10px] font-bold text-red animate-pulse">
+                <div className="w-1.5 h-1.5 bg-red rounded-full shadow-[0_0_5px_rgba(255,68,68,0.8)]" />
+                DISTRIBUTING
+            </div>
+        )
+    }
+
+    return (
+        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[10px] font-bold text-white/40">
+            <div className="w-1.5 h-1.5 bg-white/20 rounded-full" />
+            NEUTRAL
         </div>
     )
 }
@@ -404,6 +442,7 @@ export default function Dashboard() {
                                     >
                                         SYMBOL <SortIcon columnKey="symbol" />
                                     </th>
+                                    <th className="text-left p-2 min-w-[100px] opacity-50 font-mono text-[10px] uppercase">Signal</th>
                                     <th className="text-center p-2 w-10">⬍</th>
                                     <th
                                         className="text-right p-2 cursor-pointer hover:text-green select-none"
@@ -424,6 +463,7 @@ export default function Dashboard() {
                                     >
                                         SM$ <SortIcon columnKey="smart_wallets" />
                                     </th>
+                                    <th className="text-center p-2 opacity-50 font-mono text-[10px] uppercase">SM$ Trend</th>
                                     <th
                                         className="text-right p-2 min-w-[80px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('volume')}
@@ -500,6 +540,9 @@ export default function Dashboard() {
                                                     {token.symbol} ↗
                                                 </a>
                                             </td>
+                                            <td className="p-2">
+                                                <SignalIndicator token={token} />
+                                            </td>
                                             <td className="p-2 text-center">
                                                 <FlowArrow value={token.net_flows} />
                                             </td>
@@ -514,6 +557,9 @@ export default function Dashboard() {
                                             </td>
                                             <td className="p-2 text-right font-mono text-green/80 text-sm">
                                                 {token.smart_wallets}
+                                            </td>
+                                            <td className="p-2">
+                                                <Sparkline data={token.wallet_history || []} />
                                             </td>
                                             <td className="p-2 text-right font-mono opacity-80 text-sm">
                                                 ${formatNumber(token.volume)}

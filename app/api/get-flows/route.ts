@@ -33,18 +33,25 @@ export async function GET(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         interface TokenAggregation extends Record<string, any> {
             price_history: number[];
+            wallet_history: number[];
         }
         const tokenMap = new Map<string, TokenAggregation>()
         data.forEach(row => {
             if (!tokenMap.has(row.symbol)) {
                 tokenMap.set(row.symbol, {
                     ...row,
-                    price_history: [parseFloat(row.price_change_pct || 0)]
+                    price_history: [parseFloat(row.price_change_pct || 0)],
+                    wallet_history: [parseInt(row.smart_wallet_count || 0)]
                 })
             } else {
                 const existing = tokenMap.get(row.symbol)
-                if (existing && existing.price_history.length < 15) {
-                    existing.price_history.push(parseFloat(row.price_change_pct || 0))
+                if (existing) {
+                    if (existing.price_history.length < 15) {
+                        existing.price_history.push(parseFloat(row.price_change_pct || 0))
+                    }
+                    if (existing.wallet_history.length < 15) {
+                        existing.wallet_history.push(parseInt(row.smart_wallet_count || 0))
+                    }
                 }
             }
         })
@@ -65,6 +72,7 @@ export async function GET(request: NextRequest) {
                 token_age: token.token_age || 0,
                 token_sectors: token.token_sectors || [],
                 price_history: token.price_history.reverse(), // chronologically
+                wallet_history: token.wallet_history.reverse(), // chronologically
             }))
             .sort((a, b) => b.net_flows - a.net_flows)
             .slice(0, 30) // Limit to top 30
