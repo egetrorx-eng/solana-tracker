@@ -74,13 +74,10 @@ const myHandler: Handler = async () => {
         const addrCol = existingColumns.includes('token_address') ? 'token_address' : 'mint_address'
 
         const dbTimeframes = [
-            { db: '5min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '10min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '30min', dexKey: 'h1', nansenFlowKey: 'net_flow_1h_usd' },
             { db: '1h', dexKey: 'h1', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '6h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
-            { db: '12h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
             { db: '24h', dexKey: 'h24', nansenFlowKey: 'net_flow_24h_usd' },
+            { db: '7d', dexKey: 'h24', nansenFlowKey: 'net_flow_7d_usd' },
+            { db: '30d', dexKey: 'h24', nansenFlowKey: 'net_flow_30d_usd' },
         ]
 
         // Delete-then-insert per timeframe (no unique constraint needed)
