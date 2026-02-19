@@ -15,6 +15,10 @@ interface TokenData {
     inflows: number
     outflows: number
     net_flows: number
+    flow_1h: number
+    flow_24h: number
+    flow_7d: number
+    flow_30d: number
     token_age?: number
     token_sectors?: string[]
 }
@@ -30,8 +34,14 @@ function formatNumber(num: number | null | undefined): string {
     return num.toFixed(2)
 }
 
+function formatFlow(num: number): string {
+    if (num === 0) return '$0'
+    const prefix = num >= 0 ? '+$' : '-$'
+    return prefix + formatNumber(Math.abs(num))
+}
+
 export default function Dashboard() {
-    const [timeframe, setTimeframe] = useState('5MIN')
+    const [timeframe, setTimeframe] = useState('1H')
     const [data, setData] = useState<TokenData[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -58,8 +68,8 @@ export default function Dashboard() {
     })
 
     const SortArrow = ({ col }: { col: SortKey }) => {
-        if (sortKey !== col) return <span className="sort-indicator inactive">⇅</span>
-        return <span className="sort-indicator active">{sortDir === 'desc' ? '▼' : '▲'}</span>
+        if (sortKey !== col) return <span className="sort-indicator inactive">[-]</span>
+        return <span className="sort-indicator active">{sortDir === 'desc' ? '[↓]' : '[↑]'}</span>
     }
 
     const fetchData = useCallback(async () => {
@@ -102,14 +112,15 @@ export default function Dashboard() {
     }, [fetchData])
 
     const columns: { key: SortKey; label: string; format: (t: TokenData) => string; align: string; color?: (t: TokenData) => string }[] = [
-        { key: 'price_change', label: `${timeframe} %`, align: 'right', format: t => `${t.price_change >= 0 ? '+' : ''}${t.price_change.toFixed(2)}%`, color: t => t.price_change < 0 ? 'negative' : 'positive' },
-        { key: 'market_cap', label: 'MARKETCAP', align: 'right', format: t => `$${formatNumber(t.market_cap)}` },
-        { key: 'smart_wallets', label: 'SM WALLETS', align: 'center', format: t => String(t.smart_wallets) },
-        { key: 'volume', label: 'VOLUMES', align: 'right', format: t => `$${formatNumber(t.volume)}` },
-        { key: 'liquidity', label: 'LIQUIDITY', align: 'right', format: t => `$${formatNumber(t.liquidity)}` },
-        { key: 'inflows', label: 'INFLOWS', align: 'right', format: t => `$${formatNumber(t.inflows)}`, color: () => 'positive' },
-        { key: 'outflows', label: 'OUTFLOWS', align: 'right', format: t => `$${formatNumber(t.outflows)}`, color: () => 'negative' },
-        { key: 'net_flows', label: 'NETFLOWS', align: 'right', format: t => `${t.net_flows >= 0 ? '+' : ''}$${formatNumber(t.net_flows)}`, color: t => t.net_flows < 0 ? 'negative' : 'positive' },
+        { key: 'price_change', label: `${timeframe}%`, align: 'right', format: t => `${t.price_change >= 0 ? '+' : ''}${t.price_change.toFixed(2)}%`, color: t => t.price_change < 0 ? 'negative' : 'positive' },
+        { key: 'market_cap', label: 'MCAP', align: 'right', format: t => `$${formatNumber(t.market_cap)}` },
+        { key: 'smart_wallets', label: 'SMS', align: 'center', format: t => String(t.smart_wallets) },
+        { key: 'volume', label: 'VOL', align: 'right', format: t => `$${formatNumber(t.volume)}` },
+        { key: 'liquidity', label: 'LIQ', align: 'right', format: t => `$${formatNumber(t.liquidity)}` },
+        { key: 'flow_1h', label: '1H FLOW', align: 'right', format: t => formatFlow(t.flow_1h), color: t => t.flow_1h < 0 ? 'negative' : 'positive' },
+        { key: 'flow_24h', label: '24H FLOW', align: 'right', format: t => formatFlow(t.flow_24h), color: t => t.flow_24h < 0 ? 'negative' : 'positive' },
+        { key: 'flow_7d', label: '7D FLOW', align: 'right', format: t => formatFlow(t.flow_7d), color: t => t.flow_7d < 0 ? 'negative' : 'positive' },
+        { key: 'flow_30d', label: '30D FLOW', align: 'right', format: t => formatFlow(t.flow_30d), color: t => t.flow_30d < 0 ? 'negative' : 'positive' },
     ]
 
     return (
@@ -118,14 +129,12 @@ export default function Dashboard() {
 
             {/* Header */}
             <header className="tracker-header">
-                <h1 className="tracker-title">SOLANA MICROCAP<br />SMART MONEY TRACKER</h1>
-                <p className="tracker-subtitle">Powered by <a href="https://nsn.ai/gamefi?utm_source=tracker" target="_blank" rel="noopener noreferrer">NANSEN</a></p>
+                <h1 className="tracker-title">SOLANA MICROCAP SMART MONEY TRACKER</h1>
+                <p className="tracker-subtitle">SOURCE: <a href="https://nsn.ai/gamefi?utm_source=tracker" target="_blank" rel="noopener noreferrer">NANSEN_INTELLIGENCE_API</a> | TRACKING {data.length} TOKENS</p>
             </header>
 
-            {/* Status Bar */}
+            {/* Refresh Counter */}
             <div className="status-bar">
-                <span className="status-item">TRACKING {data.length} TOKENS</span>
-                <span className="status-divider">|</span>
                 <span className="status-item">
                     <span className={`status-dot ${countdown <= 5 ? 'warning' : ''}`} />
                     REFRESH: {countdown}s
@@ -147,11 +156,11 @@ export default function Dashboard() {
                         className={`tf-btn ${timeframe === tf ? 'active' : ''}`}
                         title={`Press ${idx + 1}`}
                     >
-                        {tf}
+                        {idx + 1}: {tf}
                     </button>
                 ))}
                 <button onClick={fetchData} className="tf-btn refresh-btn" title="Press R">
-                    REFRESH
+                    R: REFRESH
                 </button>
             </div>
 
@@ -178,10 +187,10 @@ export default function Dashboard() {
                     <tbody>
                         {sortedData.length === 0 && !loading ? (
                             <tr>
-                                <td colSpan={10} className="empty-state">
+                                <td colSpan={11} className="empty-state">
                                     <div className="empty-icon">[ ! ]</div>
-                                    <p>{error ? `Error: ${error}` : 'No data detected for this timeframe'}</p>
-                                    <button onClick={fetchData} className="retry-btn">RETRY</button>
+                                    <p>{error ? `ERROR: ${error}` : 'NO SPECTRAL DATA DETECTED IN THIS TIMEFRAME'}</p>
+                                    <button onClick={fetchData} className="retry-btn">RETRY SYSTEM SCAN</button>
                                 </td>
                             </tr>
                         ) : (
@@ -194,7 +203,7 @@ export default function Dashboard() {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
-                                            {token.symbol}
+                                            {token.symbol} ↗
                                         </a>
                                     </td>
                                     {columns.map(col => (
@@ -214,7 +223,7 @@ export default function Dashboard() {
 
             {/* Footer */}
             <footer className="tracker-footer">
-                KEYBOARD: 1-4 for timeframes | R to refresh | Data updates every 30s
+                KEYBOARD: 1-4 for timeframes | R to refresh | Data updates every 30 seconds
             </footer>
         </div>
     )
