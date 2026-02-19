@@ -28,16 +28,13 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey)
-const NANSEN_API_KEY = 'LMKwN29RPgiy5oBJVDqaC9OXeJjBdNgd' // Using provided key
-const TIMEFRAMES = ['24h'] // The current netflow API focuses on 24h, 7d, 30d. We will map 24h for now.
+const NANSEN_API_KEY = env.NANSEN_API_KEY || 'LMKwN29RPgiy5oBJVDqaC9OXeJjBdNgd'
 
 async function fetchNansenData(): Promise<any[]> {
     console.log(`Fetching 24h Netflows from Nansen...`)
     try {
         const fetchFunc: any = (global as any).fetch || (globalThis as any).fetch
-        if (!fetchFunc) {
-            throw new Error('Fetch not found in this node version')
-        }
+        if (!fetchFunc) throw new Error('Fetch not found in this node version')
 
         const response = await fetchFunc(
             `https://api.nansen.ai/api/v1/smart-money/netflow`,
@@ -57,12 +54,12 @@ async function fetchNansenData(): Promise<any[]> {
 
         if (!response.ok) {
             const error = await response.text()
-            console.log(`API_ERROR_${response.status}: ${error}`);
+            console.log(`API_ERROR_${response.status}: ${error}`)
             return []
         }
 
         const json = await response.json()
-        console.log(`API_SUCCESS: Received ${json.data?.length || 0} tokens`);
+        console.log(`API_SUCCESS: Received ${json.data?.length || 0} tokens`)
         return json.data || []
     } catch (error: any) {
         console.error(`Error: ${error.message}`)
@@ -86,61 +83,89 @@ async function fetchDexScreenerData(addresses: string[]): Promise<any[]> {
 }
 
 async function main() {
-    console.log('--- Nansen + DexScreener Live Sync (Multi-Timeframe) ---')
+    console.log('--- Nansen + DexScreener Live Sync ---')
     const nansenTokens = await fetchNansenData()
-    if (nansenTokens.length > 0) {
-        const addresses = nansenTokens.map(t => t.token_address).filter(Boolean)
-        const dexPairs = await fetchDexScreenerData(addresses)
+    if (nansenTokens.length === 0) {
+        console.log('No tokens fetched. Exiting.')
+        return
+    }
 
-        // Map dex pairs by address for quick lookup
-        const dexMap = new Map()
-        dexPairs.forEach((pair: any) => {
-            // DexScreener returns multiple pairs, we take the one with highest liquidity (often Raydium)
-            const existing = dexMap.get(pair.baseToken.address)
-            if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
-                dexMap.set(pair.baseToken.address, pair)
+    const addresses = nansenTokens.map((t: any) => t.token_address).filter(Boolean)
+    const dexPairs = await fetchDexScreenerData(addresses)
+
+    // Map dex pairs by address for quick lookup
+    const dexMap = new Map()
+    dexPairs.forEach((pair: any) => {
+        const existing = dexMap.get(pair.baseToken.address)
+        if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
+            dexMap.set(pair.baseToken.address, pair)
+        }
+    })
+
+    // Detect existing DB columns
+    const { data: sampleData } = await supabase.from('token_flows').select('*').limit(1)
+    const existingColumns = sampleData && sampleData[0] ? Object.keys(sampleData[0]) : ['symbol', 'mint_address', 'timeframe', 'price_change_pct', 'market_cap', 'smart_wallet_count', 'volume', 'liquidity', 'inflows', 'outflows', 'net_flows', 'fetched_at']
+    const addrCol = existingColumns.includes('token_address') ? 'token_address' : 'mint_address'
+    console.log(`DB address column: ${addrCol}`)
+
+    const timeframeMapping = [
+        { db: '5min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
+        { db: '10min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
+        { db: '30min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
+        { db: '1h', dexKey: 'h1', nansenFlowKey: 'net_flow_1h_usd' },
+        { db: '6h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
+        { db: '12h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
+        { db: '24h', dexKey: 'h24', nansenFlowKey: 'net_flow_24h_usd' }
+    ]
+
+    console.log(`Syncing ${nansenTokens.length} tokens across ${timeframeMapping.length} timeframes...`)
+
+    for (const map of timeframeMapping) {
+        // 1. Delete all existing rows for this timeframe
+        const { error: delError } = await supabase!
+            .from('token_flows')
+            .delete()
+            .eq('timeframe', map.db)
+
+        if (delError) {
+            console.error(`❌ Delete ${map.db}:`, delError.message)
+            continue
+        }
+
+        // 2. Build fresh rows
+        const rows = nansenTokens.map((token: any) => {
+            const dexData = dexMap.get(token.token_address)
+            const volumeValue = dexData?.volume?.[map.dexKey] || (map.dexKey === 'm5' ? 0 : dexData?.volume?.h24) || 0
+            const netFlow = Number(token[map.nansenFlowKey] || 0)
+
+            const row: any = {
+                symbol: (token.token_symbol || '').substring(0, 10),
+                [addrCol]: token.token_address,
+                timeframe: map.db,
+                price_change_pct: dexData?.priceChange?.[map.dexKey] || 0,
+                market_cap: token.market_cap_usd || dexData?.fdv || 0,
+                smart_wallet_count: token.trader_count || 0,
+                volume: volumeValue,
+                liquidity: dexData?.liquidity?.usd || 0,
+                inflows: netFlow > 0 ? netFlow : 0,
+                outflows: netFlow < 0 ? Math.abs(netFlow) : 0,
+                net_flows: netFlow,
+                fetched_at: new Date().toISOString()
             }
+            if (existingColumns.includes('token_age')) row.token_age = token.token_age_days || 0
+            if (existingColumns.includes('token_sectors')) row.token_sectors = token.token_sectors || []
+            return row
         })
 
-        console.log(`Updating ${nansenTokens.length} tokens for 7 timeframes...`)
-
-        // Comprehensive mapping for all UI timeframes
-        const timeframeMapping = [
-            { db: '5min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '10min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '30min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '1h', dexKey: 'h1', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '6h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
-            { db: '12h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
-            { db: '24h', dexKey: 'h24', nansenFlowKey: 'net_flow_24h_usd' }
-        ]
-
-        for (const token of nansenTokens) {
-            const dexData = dexMap.get(token.token_address)
-
-            for (const map of timeframeMapping) {
-                // Correctly map volume to the timeframe interval
-                const volumeValue = dexData?.volume?.[map.dexKey] || (map.dexKey === 'm5' ? 0 : dexData?.volume?.h24) || 0
-
-                await supabase.from('token_flows').upsert({
-                    symbol: token.token_symbol,
-                    token_address: token.token_address,
-                    timeframe: map.db,
-                    price_change_pct: dexData?.priceChange?.[map.dexKey] || 0,
-                    market_cap: token.market_cap_usd || dexData?.fdv || 0,
-                    smart_wallet_count: token.trader_count || 0,
-                    volume: volumeValue,
-                    liquidity: dexData?.liquidity?.usd || 0,
-                    inflows: 0,
-                    outflows: 0,
-                    net_flows: token[map.nansenFlowKey] || 0,
-                    token_age: token.token_age_days || 0,
-                    token_sectors: token.token_sectors || [],
-                    fetched_at: new Date().toISOString()
-                }, { onConflict: 'symbol,timeframe' })
-            }
+        // 3. Bulk insert
+        const { error: insertError } = await supabase.from('token_flows').insert(rows)
+        if (insertError) {
+            console.error(`❌ Insert ${map.db}:`, insertError.message)
+        } else {
+            console.log(`✅ ${map.db}: ${rows.length} tokens`)
         }
     }
+
     console.log('--- Done ---')
 }
 

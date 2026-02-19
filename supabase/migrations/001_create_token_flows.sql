@@ -1,8 +1,8 @@
 -- Create token_flows table
 CREATE TABLE IF NOT EXISTS token_flows (
   id SERIAL PRIMARY KEY,
-  symbol VARCHAR(10) NOT NULL,
-  mint_address VARCHAR(44) NOT NULL,
+  symbol VARCHAR(50) NOT NULL,
+  token_address VARCHAR(44) NOT NULL,
   timeframe VARCHAR(10) NOT NULL,
   price_change_pct DECIMAL(5,2),
   market_cap DECIMAL(15,2),

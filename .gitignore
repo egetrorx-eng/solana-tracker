@@ -28,3 +28,13 @@ npm-debug.log*
 # Build files
 dist/
 build/
+
+# Temp test files
+api_test*.txt
+live_api_test*.txt
+curl_out*.txt
+lint_errors*
+lint_output*
+script_output*
+api_output*
+log.txt

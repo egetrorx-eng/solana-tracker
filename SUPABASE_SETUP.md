@@ -26,7 +26,7 @@ After running the migration, verify everything was created:
 You should see these columns:
 - `id` (int8, primary key)
 - `symbol` (varchar)
-- `mint_address` (varchar)
+- `token_address` (varchar)
 - `timeframe` (varchar)
 - `price_change_pct` (numeric)
 - `market_cap` (numeric)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 const TIMEFRAMES = ['5MIN', '10MIN', '30MIN', '1H', '6H', '12H', '24H']
 
@@ -20,20 +20,6 @@ interface TokenData {
     price_history?: number[]
     wallet_history?: number[]
 }
-
-const MARKET_CAP_FILTERS = [
-    { label: 'All', value: 0 },
-    { label: '>$100K', value: 100000 },
-    { label: '>$500K', value: 500000 },
-    { label: '>$1M', value: 1000000 },
-    { label: '>$5M', value: 5000000 },
-]
-
-const FLOW_FILTERS = [
-    { label: 'All', value: 'all' },
-    { label: 'Inflows Only', value: 'inflows' },
-    { label: 'Outflows Only', value: 'outflows' },
-]
 
 function formatNumber(num: number | null | undefined): string {
     if (num === null || num === undefined || isNaN(num)) {
@@ -63,102 +49,13 @@ function FlowBar({ value, maxValue, isPositive }: { value: number; maxValue: num
     )
 }
 
-function FlowArrow({ value }: { value: number }) {
-    if (value > 0) {
-        return <span className="text-green text-lg">▲</span>
-    } else if (value < 0) {
-        return <span className="text-red text-lg">▼</span>
-    }
-    return <span className="text-green/30">–</span>
-}
-
-function Sparkline({ data }: { data: number[] }) {
-    if (!data || data.length < 2) return <div className="w-16 h-8 opacity-20 border-b border-green/20" />
-
-    const min = Math.min(...data)
-    const max = Math.max(...data)
-    const range = max - min || 1
-    const width = 80
-    const height = 30
-    const padding = 2
-
-    const points = data.map((val, i) => {
-        const x = (i / (data.length - 1)) * width
-        const y = padding + (height - 2 * padding) * (1 - (val - min) / range)
-        return `${x},${y}`
-    }).join(' ')
-
-    const isUp = data[data.length - 1] >= data[0]
-
-    return (
-        <div className="w-20 h-8 flex items-center">
-            <svg width={width} height={height} className="overflow-visible">
-                <polyline
-                    fill="none"
-                    stroke={isUp ? '#00FF41' : '#ff4444'}
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    points={points}
-                    className="drop-shadow-[0_0_2px_rgba(0,255,65,0.5)]"
-                />
-            </svg>
-        </div>
-    )
-}
-
-function SignalIndicator({ token }: { token: TokenData }) {
-    const isAccumulating = token.net_flows > 0 &&
-        token.wallet_history &&
-        token.wallet_history.length >= 2 &&
-        token.wallet_history[token.wallet_history.length - 1] > token.wallet_history[0]
-
-    const isDistributing = token.net_flows < 0 &&
-        token.wallet_history &&
-        token.wallet_history.length >= 2 &&
-        token.wallet_history[token.wallet_history.length - 1] < token.wallet_history[0]
-
-    if (isAccumulating) {
-        return (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green/10 border border-green/30 rounded text-[10px] font-bold text-green animate-pulse">
-                <div className="w-1.5 h-1.5 bg-green rounded-full shadow-[0_0_5px_rgba(0,255,65,0.8)]" />
-                ACCUMULATING
-            </div>
-        )
-    }
-
-    if (isDistributing) {
-        return (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-red/10 border border-red/30 rounded text-[10px] font-bold text-red animate-pulse">
-                <div className="w-1.5 h-1.5 bg-red rounded-full shadow-[0_0_5px_rgba(255,68,68,0.8)]" />
-                DISTRIBUTING
-            </div>
-        )
-    }
-
-    return (
-        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[10px] font-bold text-white/40">
-            <div className="w-1.5 h-1.5 bg-white/20 rounded-full" />
-            NEUTRAL
-        </div>
-    )
-}
-
 export default function Dashboard() {
     const [timeframe, setTimeframe] = useState('5MIN')
     const [data, setData] = useState<TokenData[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: keyof TokenData; direction: 'asc' | 'desc' } | null>({ key: 'net_flows', direction: 'desc' })
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
     const [countdown, setCountdown] = useState(30)
-    const [minMarketCap, setMinMarketCap] = useState(0)
-    const [flowFilter, setFlowFilter] = useState<'all' | 'inflows' | 'outflows'>('all')
-    const [sectorFilter, setSectorFilter] = useState('All')
-    const [soundEnabled, setSoundEnabled] = useState(false)
-
-    // Extract unique sectors for filter
-    const uniqueSectors = Array.from(new Set(data.flatMap(t => t.token_sectors || []))).sort()
 
     const handleSort = (key: keyof TokenData) => {
         let direction: 'asc' | 'desc' = 'desc'
@@ -168,24 +65,9 @@ export default function Dashboard() {
         setSortConfig({ key, direction })
     }
 
-    // Apply filters
-    const filteredData = data.filter(token => {
-        if (token.market_cap < minMarketCap) return false
-        if (flowFilter === 'inflows' && token.net_flows <= 0) return false
-        if (flowFilter === 'outflows' && token.net_flows >= 0) return false
-        if (sectorFilter !== 'All' && !token.token_sectors?.includes(sectorFilter)) return false
-        return true
-    })
-
-    const sortedData = [...filteredData].sort((a, b) => {
+    const sortedData = [...data].sort((a, b) => {
         if (!sortConfig) return 0
         const { key, direction } = sortConfig
-
-        if (key === 'token_sectors') {
-            const valA = (a[key] as string[])?.[0] || ''
-            const valB = (b[key] as string[])?.[0] || ''
-            return direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA)
-        }
 
         if (typeof a[key] === 'string' && typeof b[key] === 'string') {
             return direction === 'asc'
@@ -199,26 +81,6 @@ export default function Dashboard() {
     })
 
     const maxNetFlow = Math.max(...data.map(t => Math.abs(t.net_flows)), 1)
-
-    // Sector Aggregation Logic
-    const sectorStats = uniqueSectors.map(sector => {
-        const sectorTokens = data.filter(t => t.token_sectors?.includes(sector))
-        const totalFlow = sectorTokens.reduce((acc, t) => acc + t.net_flows, 0)
-        const avgPriceChange = sectorTokens.length > 0
-            ? sectorTokens.reduce((acc, t) => acc + t.price_change, 0) / sectorTokens.length
-            : 0
-        const totalWallets = sectorTokens.reduce((acc, t) => acc + t.smart_wallets, 0)
-
-        return {
-            name: sector,
-            flow: totalFlow,
-            price: avgPriceChange,
-            wallets: totalWallets,
-            tokenCount: sectorTokens.length
-        }
-    }).sort((a, b) => b.flow - a.flow)
-
-    const maxSectorFlow = Math.max(...sectorStats.map(s => Math.abs(s.flow)), 1)
 
     const SortIcon = ({ columnKey }: { columnKey: keyof TokenData }) => {
         if (sortConfig?.key !== columnKey) return <span className="text-green/20 ml-1">[-]</span>
@@ -241,7 +103,6 @@ export default function Dashboard() {
             }
 
             setData(json)
-            setLastUpdated(new Date())
             setCountdown(30)
         } catch (error: unknown) {
             console.error('Error fetching data:', error)
@@ -250,47 +111,6 @@ export default function Dashboard() {
         }
         setLoading(false)
     }, [timeframe])
-
-    // Sound alert function
-    const playAlertSound = useCallback(() => {
-        if (typeof window === 'undefined') return
-        try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-            if (!AudioContextClass) return
-            const audioContext = new AudioContextClass()
-            const oscillator = audioContext.createOscillator()
-            const gainNode = audioContext.createGain()
-            oscillator.connect(gainNode)
-            gainNode.connect(audioContext.destination)
-            oscillator.frequency.value = 800
-            oscillator.type = 'sine'
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-            oscillator.start(audioContext.currentTime)
-            oscillator.stop(audioContext.currentTime + 0.3)
-        } catch {
-            console.log('Audio not available')
-        }
-    }, [])
-
-    // Track previous data for sound alerts
-    const prevDataRef = useRef<TokenData[]>([])
-
-    useEffect(() => {
-        if (soundEnabled && data.length > 0 && prevDataRef.current.length > 0) {
-            // Check for new big inflows (>$100K)
-            const newBigInflows = data.filter(token => {
-                const prev = prevDataRef.current.find(p => p.symbol === token.symbol)
-                if (!prev) return token.net_flows > 100000
-                return token.net_flows > prev.net_flows && token.net_flows > 100000
-            })
-            if (newBigInflows.length > 0) {
-                playAlertSound()
-            }
-        }
-        prevDataRef.current = data
-    }, [data, soundEnabled, playAlertSound])
 
     useEffect(() => {
         fetchData()
@@ -343,57 +163,15 @@ export default function Dashboard() {
                                 NANSEN_INTELLIGENCE_API
                             </a>
                         </span>
+                        <span className="opacity-50">|</span>
+                        <span className="text-green/60">TRACKING {data.length} TOKENS</span>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs font-mono mt-4">
-                    <span className="text-green/60">TRACKING {data.length} TOKENS</span>
-                    <span className="opacity-50">|</span>
-                    {lastUpdated && (
-                        <span className="opacity-50">
-                            UPDATED: {lastUpdated.toLocaleTimeString()}
-                        </span>
-                    )}
-                    <div className="flex items-center gap-2 px-3 py-1 bg-green/5 border border-green/20 rounded">
-                        <div className={`w-2 h-2 rounded-full ${countdown <= 5 ? 'bg-yellow-500 animate-pulse' : 'bg-green/50'}`} />
-                        <span className="tabular-nums">REFRESH: {countdown}s</span>
-                    </div>
+                {/* Refresh counter - top right */}
+                <div className="absolute top-0 right-0 flex items-center gap-2 text-xs font-mono">
+                    <div className={`w-2 h-2 rounded-full ${countdown <= 5 ? 'bg-yellow-500 animate-pulse' : 'bg-green'}`} />
+                    <span className="tabular-nums glow-text">REFRESH: {countdown}s</span>
                 </div>
-            </div>
-
-            {/* Sector Analytics Leaderboard */}
-            <div className="mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-20">
-                {sectorStats.slice(0, 4).map((s, idx) => (
-                    <div
-                        key={s.name}
-                        onClick={() => setSectorFilter(s.name)}
-                        className={`p-4 border border-green/20 bg-green/5 rounded group cursor-pointer hover:border-green/50 transition-all ${sectorFilter === s.name ? 'border-green/60 bg-green/10' : ''}`}
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] opacity-40 font-mono">SECTOR_0{idx + 1}</span>
-                            <span className={`text-[10px] font-mono font-bold ${s.price >= 0 ? 'text-green' : 'text-red'}`}>
-                                {s.price >= 0 ? '+' : ''}{s.price.toFixed(1)}%
-                            </span>
-                        </div>
-                        <h3 className="text-sm font-bold tracking-widest uppercase mb-1 flex items-center gap-2">
-                            {s.name}
-                            {idx === 0 && <span className="text-[10px] bg-green text-black px-1 rounded">HOT</span>}
-                        </h3>
-                        <div className="flex justify-between items-end">
-                            <div className="flex flex-col">
-                                <span className={`text-xs font-mono font-bold ${s.flow >= 0 ? 'text-green' : 'text-red'}`}>
-                                    {s.flow >= 0 ? '+' : ''}${formatNumber(s.flow)}
-                                </span>
-                                <span className="text-[10px] opacity-40 font-mono">{s.wallets} WALLETS</span>
-                            </div>
-                            <div className="w-20 h-1 bg-green/10 rounded-full overflow-hidden">
-                                <div
-                                    className={`h-full ${s.flow >= 0 ? 'bg-green' : 'bg-red'}`}
-                                    style={{ width: `${(Math.abs(s.flow) / maxSectorFlow) * 100}%` }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                ))}
             </div>
 
             {/* Timeframe Buttons */}
@@ -408,7 +186,7 @@ export default function Dashboard() {
                             }`}
                         title={`Press ${idx + 1} for ${tf}`}
                     >
-                        {tf}
+                        {idx + 1}: {tf}
                     </button>
                 ))}
                 <button
@@ -416,57 +194,8 @@ export default function Dashboard() {
                     className="px-4 py-2 border border-green text-green hover:bg-green-darker transition-all font-mono"
                     title="Press R to refresh"
                 >
-                    ↻ REFRESH
+                    R: REFRESH
                 </button>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 mb-4 text-xs font-mono">
-                <div className="flex items-center gap-2">
-                    <span className="opacity-60">MCAP:</span>
-                    <select
-                        value={minMarketCap}
-                        onChange={(e) => setMinMarketCap(Number(e.target.value))}
-                        className="bg-black border border-green/30 text-green px-2 py-1 rounded focus:border-green outline-none"
-                    >
-                        {MARKET_CAP_FILTERS.map(f => (
-                            <option key={f.value} value={f.value}>{f.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="opacity-60">FLOWS:</span>
-                    <select
-                        value={flowFilter}
-                        onChange={(e) => setFlowFilter(e.target.value as 'all' | 'inflows' | 'outflows')}
-                        className="bg-black border border-green/30 text-green px-2 py-1 rounded focus:border-green outline-none"
-                    >
-                        {FLOW_FILTERS.map(f => (
-                            <option key={f.value} value={f.value}>{f.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="opacity-60">SECTOR:</span>
-                    <select
-                        value={sectorFilter}
-                        onChange={(e) => setSectorFilter(e.target.value)}
-                        className="bg-black border border-green/30 text-green px-2 py-1 rounded focus:border-green outline-none max-w-[120px]"
-                    >
-                        <option value="All">All Sectors</option>
-                        {uniqueSectors.map(s => (
-                            <option key={s} value={s}>{s}</option>
-                        ))}
-                    </select>
-                </div>
-                <button
-                    onClick={() => setSoundEnabled(!soundEnabled)}
-                    className={`px-3 py-1 border rounded transition-all ${soundEnabled ? 'border-green bg-green/20 text-green' : 'border-green/30 text-green/50'}`}
-                    title="Toggle sound alerts for big inflows"
-                >
-                    {soundEnabled ? '🔊 ALERTS ON' : '🔇 ALERTS OFF'}
-                </button>
-                <span className="opacity-40 ml-auto">Showing {sortedData.length} of {data.length} tokens</span>
             </div>
 
             {/* Loading Indicator */}
@@ -480,11 +209,6 @@ export default function Dashboard() {
                     </div>
                 )
             }
-
-            {/* Mobile Scroll Hint */}
-            <div className="md:hidden flex items-center justify-center gap-2 mb-2 text-[10px] font-mono opacity-40 animate-pulse">
-                <span>← SCROLL TABLE TO VIEW MORE DATA →</span>
-            </div>
 
             {/* Table */}
             <div className="overflow-x-auto -mx-4 md:mx-0">
@@ -500,28 +224,25 @@ export default function Dashboard() {
                                     >
                                         SYMBOL <SortIcon columnKey="symbol" />
                                     </th>
-                                    <th className="text-left p-2 min-w-[100px] opacity-50 font-mono text-[10px] uppercase">Signal</th>
                                     <th className="text-center p-2 w-10">⬍</th>
                                     <th
                                         className="text-right p-2 cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('price_change')}
                                     >
-                                        PRICE % <SortIcon columnKey="price_change" />
+                                        {timeframe}% <SortIcon columnKey="price_change" />
                                     </th>
-                                    <th className="text-center p-2 opacity-50 font-mono text-[10px] uppercase">Trend</th>
                                     <th
                                         className="text-right p-2 cursor-pointer hover:text-green select-none"
                                         onClick={() => handleSort('market_cap')}
                                     >
-                                        MKT CAP <SortIcon columnKey="market_cap" />
+                                        MCAP <SortIcon columnKey="market_cap" />
                                     </th>
                                     <th
                                         className="text-right p-2 min-w-[70px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('smart_wallets')}
                                     >
-                                        SM$ <SortIcon columnKey="smart_wallets" />
+                                        SMS <SortIcon columnKey="smart_wallets" />
                                     </th>
-                                    <th className="text-center p-2 opacity-50 font-mono text-[10px] uppercase">SM$ Trend</th>
                                     <th
                                         className="text-right p-2 min-w-[80px] cursor-pointer hover:bg-green-darker select-none transition-colors"
                                         onClick={() => handleSort('volume')}
@@ -565,7 +286,7 @@ export default function Dashboard() {
                                     <tr>
                                         <td colSpan={12} className="text-center py-20">
                                             <div className="flex flex-col items-center justify-center gap-4">
-                                                <div className="text-green/20 text-4xl font-mono">[!]</div>
+                                                <div className="text-green/20 text-4xl font-mono">[ ! ]</div>
                                                 <p className="text-green/60 font-mono tracking-widest uppercase">
                                                     {error ? `System Error: ${error}` : "No spectral data detected in this timeframe"}
                                                 </p>
@@ -588,43 +309,33 @@ export default function Dashboard() {
                                                 {idx + 1}
                                             </td>
                                             <td className="p-2 sticky left-0 bg-black z-10 font-bold group-hover:glow-text transition-all">
-                                                <div className="flex flex-col">
-                                                    <a
-                                                        href={`https://dexscreener.com/solana/${token.token_address || token.symbol}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="hover:underline hover:text-green transition-all"
-                                                        title="View on DexScreener"
-                                                    >
-                                                        {token.symbol} ↗
-                                                    </a>
-                                                    {token.token_sectors && token.token_sectors.length > 0 && (
-                                                        <span className="text-[8px] opacity-30 font-mono uppercase tracking-tighter">
-                                                            {token.token_sectors[0]}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="p-2">
-                                                <SignalIndicator token={token} />
+                                                <a
+                                                    href={`https://dexscreener.com/solana/${token.token_address || token.symbol}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="hover:underline hover:text-green transition-all"
+                                                    title="View on DexScreener"
+                                                >
+                                                    {token.symbol} ↗
+                                                </a>
                                             </td>
                                             <td className="p-2 text-center">
-                                                <FlowArrow value={token.net_flows} />
+                                                {token.net_flows > 0 ? (
+                                                    <span className="text-green text-lg">▲</span>
+                                                ) : token.net_flows < 0 ? (
+                                                    <span className="text-red text-lg">▼</span>
+                                                ) : (
+                                                    <span className="text-green/30">–</span>
+                                                )}
                                             </td>
                                             <td className={`p-2 text-right font-mono text-sm ${token.price_change < 0 ? 'text-red' : 'text-green'}`}>
                                                 {token.price_change >= 0 ? '+' : ''}{token.price_change.toFixed(2)}%
-                                            </td>
-                                            <td className="p-2">
-                                                <Sparkline data={token.price_history || []} />
                                             </td>
                                             <td className="p-2 text-right font-mono opacity-90 text-sm">
                                                 ${formatNumber(token.market_cap)}
                                             </td>
                                             <td className="p-2 text-right font-mono text-green/80 text-sm">
                                                 {token.smart_wallets}
-                                            </td>
-                                            <td className="p-2">
-                                                <Sparkline data={token.wallet_history || []} />
                                             </td>
                                             <td className="p-2 text-right font-mono opacity-80 text-sm">
                                                 ${formatNumber(token.volume)}

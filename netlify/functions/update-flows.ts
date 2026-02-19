@@ -1,53 +1,22 @@
 import { Handler, schedule } from '@netlify/functions'
-import { supabase } from '../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
-const NANSEN_API_KEY = process.env.NANSEN_API_KEY || 'LMKwN29RPgiy5oBJVDqaC9OXeJjBdNgd'
-const TIMEFRAMES = ['5min', '10min', '30min', '1h', '6h', '12h', '24h']
+const NANSEN_API_KEY = process.env.NANSEN_API_KEY || ''
+const supabaseUrl = process.env.SUPABASE_URL || ''
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-interface NansenToken {
-    symbol: string
-    mintAddress: string
-    marketCap: number
-    price24hChange?: number
-    volume?: number
-    liquidity?: number
-    smartMoneyInflows?: number
-    smartMoneyOutflows?: number
-    smartWalletCount?: number
-}
-
-// This function would fetch data from Nansen API
-async function fetchNansenData(timeframe: string): Promise<NansenToken[]> {
-    // This function is no longer used in the updated handler, but keeping its signature for now.
-    // The actual fetching and upsert logic is moved directly into the handler.
-    return []
-}
-
-// Generate mock data for development/testing
-function generateMockData(timeframe: string): NansenToken[] {
-    const symbols = ['CRCL', 'SIGN', 'BONK', 'WIF', 'MYRO', 'POPCAT', 'MEW', 'PONKE', 'SAMO', 'FOXY']
-
-    return symbols.map((symbol, idx) => ({
-        symbol,
-        mintAddress: `${symbol}${Math.random().toString(36).substring(2, 15)}mint`,
-        marketCap: Math.random() * 5000000,
-        price24hChange: (Math.random() - 0.5) * 20,
-        volume: Math.random() * 1000000,
-        liquidity: Math.random() * 500000,
-        smartMoneyInflows: Math.random() * 100000,
-        smartMoneyOutflows: Math.random() * 80000,
-        smartWalletCount: Math.floor(Math.random() * 50) + 1,
-    }))
-}
-
-// Main handler function
 const myHandler: Handler = async () => {
     console.log('Starting scheduled update-flows function...')
+
+    if (!NANSEN_API_KEY) {
+        return { statusCode: 500, body: JSON.stringify({ error: 'NANSEN_API_KEY not set' }) }
+    }
 
     try {
         // Fetch from Nansen Smart Money Netflow API
         const nansenResponse = await fetch(
-            `https://api.nansen.ai/api/v1/smart-money/netflow`,
+            'https://api.nansen.ai/api/v1/smart-money/netflow',
             {
                 method: 'POST',
                 headers: {
@@ -57,8 +26,8 @@ const myHandler: Handler = async () => {
                 body: JSON.stringify({
                     chains: ['solana'],
                     pagination: { page: 1, per_page: 50 },
-                    order_by: [{ direction: 'DESC', field: 'net_flow_24h_usd' }]
-                })
+                    order_by: [{ direction: 'DESC', field: 'net_flow_24h_usd' }],
+                }),
             }
         )
 
@@ -69,76 +38,89 @@ const myHandler: Handler = async () => {
 
         const json = await nansenResponse.json()
         const nansenTokens = json.data || []
-
         console.log(`Fetched ${nansenTokens.length} tokens from Nansen`)
 
         // Enrich with DexScreener data
         const addresses = nansenTokens.map((t: any) => t.token_address).filter(Boolean)
-        let dexMap = new Map()
+        const dexMap = new Map()
 
         if (addresses.length > 0) {
             try {
-                const dexResponse = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addresses.join(',')}`)
-                if (dexResponse.ok) {
-                    const dexJson: any = await dexResponse.json()
-                    const dexPairs = dexJson.pairs || []
-                    dexPairs.forEach((pair: any) => {
-                        const existing = dexMap.get(pair.baseToken.address)
-                        if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
-                            dexMap.set(pair.baseToken.address, pair)
-                        }
-                    })
+                const batchSize = 30
+                for (let i = 0; i < addresses.length; i += batchSize) {
+                    const batch = addresses.slice(i, i + batchSize)
+                    const dexResponse = await fetch(
+                        `https://api.dexscreener.com/latest/dex/tokens/${batch.join(',')}`
+                    )
+                    if (dexResponse.ok) {
+                        const dexJson: any = await dexResponse.json()
+                        const dexPairs = dexJson.pairs || []
+                        dexPairs.forEach((pair: any) => {
+                            const existing = dexMap.get(pair.baseToken.address)
+                            if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
+                                dexMap.set(pair.baseToken.address, pair)
+                            }
+                        })
+                    }
                 }
             } catch (e) {
                 console.error('DexScreener enrich error:', e)
             }
         }
 
-        // Update Supabase with enriched data for 7 timeframes
+        // Detect existing DB columns
+        const { data: sampleData } = await supabase.from('token_flows').select('*').limit(1)
+        const existingColumns = sampleData && sampleData[0] ? Object.keys(sampleData[0]) : ['symbol', 'mint_address', 'timeframe', 'price_change_pct', 'market_cap', 'smart_wallet_count', 'volume', 'liquidity', 'inflows', 'outflows', 'net_flows', 'fetched_at']
+        const addrCol = existingColumns.includes('token_address') ? 'token_address' : 'mint_address'
+
         const dbTimeframes = [
             { db: '5min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
             { db: '10min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
-            { db: '30min', dexKey: 'm5', nansenFlowKey: 'net_flow_1h_usd' },
+            { db: '30min', dexKey: 'h1', nansenFlowKey: 'net_flow_1h_usd' },
             { db: '1h', dexKey: 'h1', nansenFlowKey: 'net_flow_1h_usd' },
             { db: '6h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
             { db: '12h', dexKey: 'h6', nansenFlowKey: 'net_flow_24h_usd' },
-            { db: '24h', dexKey: 'h24', nansenFlowKey: 'net_flow_24h_usd' }
+            { db: '24h', dexKey: 'h24', nansenFlowKey: 'net_flow_24h_usd' },
         ]
 
-        for (const token of nansenTokens) {
-            const dexData = dexMap.get(token.token_address)
+        // Delete-then-insert per timeframe (no unique constraint needed)
+        for (const map of dbTimeframes) {
+            await supabase.from('token_flows').delete().eq('timeframe', map.db)
 
-            for (const map of dbTimeframes) {
-                const volumeValue = dexData?.volume?.[map.dexKey] || (map.dexKey === 'm5' ? 0 : dexData?.volume?.h24) || 0
+            const rows = nansenTokens.map((token: any) => {
+                const dexData = dexMap.get(token.token_address)
+                const netFlow = token[map.nansenFlowKey] || 0
+                const volumeValue = dexData?.volume?.[map.dexKey] || 0
 
-                const { error } = await supabase.from('token_flows').upsert({
-                    symbol: token.token_symbol,
-                    token_address: token.token_address,
+                const row: any = {
+                    symbol: (token.token_symbol || '').substring(0, 10),
+                    [addrCol]: token.token_address,
                     timeframe: map.db,
                     price_change_pct: dexData?.priceChange?.[map.dexKey] || 0,
                     market_cap: token.market_cap_usd || dexData?.fdv || 0,
                     smart_wallet_count: token.trader_count || 0,
                     volume: volumeValue,
                     liquidity: dexData?.liquidity?.usd || 0,
-                    inflows: 0,
-                    outflows: 0,
-                    net_flows: token[map.nansenFlowKey] || 0,
-                    token_age: token.token_age_days || 0,
-                    token_sectors: token.token_sectors || [],
-                    fetched_at: new Date().toISOString()
-                }, { onConflict: 'symbol,timeframe' })
-
-                if (error) {
-                    console.error(`Error upserting ${token.token_symbol} for ${map.db}:`, error)
+                    inflows: netFlow > 0 ? netFlow : 0,
+                    outflows: netFlow < 0 ? Math.abs(netFlow) : 0,
+                    net_flows: netFlow,
+                    fetched_at: new Date().toISOString(),
                 }
+                if (existingColumns.includes('token_age')) row.token_age = token.token_age_days || 0
+                if (existingColumns.includes('token_sectors')) row.token_sectors = token.token_sectors || []
+                return row
+            })
+
+            const { error } = await supabase.from('token_flows').insert(rows)
+            if (error) {
+                console.error(`Error inserting ${map.db}:`, error.message)
             }
         }
 
-        console.log('Update-flows function completed successfully')
-
+        console.log('Update-flows completed successfully')
         return {
             statusCode: 200,
-            body: JSON.stringify({ message: 'Data updated successfully' }),
+            body: JSON.stringify({ message: `Updated ${nansenTokens.length} tokens` }),
         }
     } catch (error) {
         console.error('Error in update-flows:', error)
