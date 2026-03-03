@@ -112,7 +112,7 @@ export default function Dashboard() {
     }, [fetchData])
 
     const columns: { key: SortKey; label: string; format: (t: TokenData) => string; align: string; color?: (t: TokenData) => string }[] = [
-        { key: 'price_change', label: `${timeframe}%`, align: 'right', format: t => `${t.price_change >= 0 ? '+' : ''}${t.price_change.toFixed(2)}%`, color: t => t.price_change < 0 ? 'negative' : 'positive' },
+        { key: 'price_change', label: timeframe === '1H' ? '1H%' : '24H%', align: 'right', format: t => `${t.price_change >= 0 ? '+' : ''}${t.price_change.toFixed(2)}%`, color: t => t.price_change < 0 ? 'negative' : 'positive' },
         { key: 'market_cap', label: 'MCAP', align: 'right', format: t => `$${formatNumber(t.market_cap)}` },
         { key: 'smart_wallets', label: 'SMS', align: 'center', format: t => String(t.smart_wallets) },
         { key: 'volume', label: 'VOL', align: 'right', format: t => `$${formatNumber(t.volume)}` },

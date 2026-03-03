@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const NANSEN_API_KEY = process.env.NANSEN_API_KEY || ''
 
+export const dynamic = 'force-dynamic'
+
 // Map UI timeframes to Nansen netflow fields
 const TIMEFRAME_FLOW_FIELD: Record<string, string> = {
     '1h': 'net_flow_1h_usd',
