@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
                     pagination: { page: 1, per_page: 50 },
                     order_by: [{ direction: 'DESC', field: nansenFlowField }],
                 }),
-                next: { revalidate: 30 },
             }
         )
 
@@ -100,8 +99,7 @@ export async function GET(request: NextRequest) {
                 for (let i = 0; i < addresses.length; i += batchSize) {
                     const batch = addresses.slice(i, i + batchSize)
                     const dexResponse = await fetch(
-                        `https://api.dexscreener.com/latest/dex/tokens/${batch.join(',')}`,
-                        { next: { revalidate: 30 } }
+                        `https://api.dexscreener.com/latest/dex/tokens/${batch.join(',')}`
                     )
                     if (dexResponse.ok) {
                         const dexJson = await dexResponse.json()
