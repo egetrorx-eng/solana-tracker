@@ -4,11 +4,12 @@ A terminal-aesthetic, mobile-responsive dashboard tracking smart money flows on 
 
 ## Features
 
-- **Real-time Data**: Track smart money flows across 7 timeframes (5min, 10min, 30min, 1h, 6h, 12h, 24h)
-- **Terminal Aesthetic**: Black background with neon green text and monospace fonts
-- **Mobile Responsive**: Optimized for desktop traders with full mobile support
-- **9 Key Metrics**: Symbol, price change %, market cap, smart wallets, volume, liquidity, inflows, outflows, net flows
-- **Auto-refresh**: Data updates every 30 seconds automatically
+- **Real-time Data**: Aggregated smart money flows across 5 key timeframes (5MIN, 10MIN, 1H, 6H, 24H).
+- **Terminal Aesthetic**: High-contrast black background with neon green accents and scanline effects.
+- **Mobile Responsive**: Optimized for desktop traders with full 100% mobile support and sticky columns.
+- **Data Aggregation**: Unlike basic trackers, this app aggregates historical flows across all timeframes for a complete token profile.
+- **Auto-pilot**: Data updates every 15 seconds on the frontend and every 1 minute on the backend.
+- **Curated Insights**: Limited to the Top 20 tokens for high-conviction monitoring.
 
 ## Tech Stack
 
@@ -107,7 +108,8 @@ Netlify will automatically:
 Fetch token flow data for a specific timeframe.
 
 **Query Parameters:**
-- `timeframe` (optional): `5min`, `10min`, `30min`, `1h`, `6h`, `12h`, `24h` (default: `5min`)
+**Query Parameters:**
+- `timeframe` (optional): `5min`, `10min`, `1h`, `6h`, `24h` (default: `1h`)
 
 **Response:**
 ```json
@@ -128,7 +130,7 @@ Fetch token flow data for a specific timeframe.
 
 ## Scheduled Functions
 
-The `update-flows` function runs every **5 minutes** (optimized for Netlify personal plan) to:
+The `update-flows` function runs every **1 minute** to:
 
 1. Fetch Solana microcap tokens from Nansen API
 2. Calculate metrics for all 7 timeframes
@@ -148,10 +150,12 @@ nansen/
 ├── app/
 │   ├── page.tsx          # Main dashboard
 │   ├── layout.tsx        # Root layout
-│   └── globals.css       # Global styles
+│   ├── globals.css       # Terminal styling
+│   └── api/
+│       └── get-flows/
+│           └── route.ts  # Intelligent data API
 ├── netlify/functions/
-│   ├── get-flows.ts      # API endpoint
-│   └── update-flows.ts   # Scheduled data fetcher
+│   └── update-flows.ts   # Scheduled background poller
 ├── lib/
 │   ├── supabase.ts       # Supabase client
 │   └── types.ts          # TypeScript types
@@ -167,12 +171,12 @@ nansen/
 
 Frontend auto-refresh (in `app/page.tsx`):
 ```typescript
-const interval = setInterval(fetchData, 30000) // 30 seconds
+const interval = setInterval(fetchData, 15000) // 15 seconds
 ```
 
 Backend scheduled function (in `netlify.toml`):
 ```toml
-schedule = "*/5 * * * *"  # Every 5 minutes
+schedule = "* * * * *"  # Every minute
 ```
 
 ### Change Color Theme
