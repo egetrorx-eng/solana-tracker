@@ -114,10 +114,10 @@ export default function Dashboard() {
         { key: 'smart_wallets', label: 'SMS', align: 'center', format: t => String(t.smart_wallets) },
         { key: 'volume', label: 'VOL', align: 'right', format: t => `$${formatNumber(t.volume)}` },
         { key: 'liquidity', label: 'LIQ', align: 'right', format: t => `$${formatNumber(t.liquidity)}` },
+        { key: 'net_flows', label: `${timeframe.label} FLOW`, align: 'right', format: t => formatFlow(t.net_flows), color: t => t.net_flows < 0 ? 'negative' : 'positive' },
         { key: 'flow_1h', label: '1H FLOW', align: 'right', format: t => formatFlow(t.flow_1h), color: t => t.flow_1h < 0 ? 'negative' : 'positive' },
         { key: 'flow_24h', label: '24H FLOW', align: 'right', format: t => formatFlow(t.flow_24h), color: t => t.flow_24h < 0 ? 'negative' : 'positive' },
         { key: 'flow_7d', label: '7D FLOW', align: 'right', format: t => formatFlow(t.flow_7d), color: t => t.flow_7d < 0 ? 'negative' : 'positive' },
-        { key: 'flow_30d', label: '30D FLOW', align: 'right', format: t => formatFlow(t.flow_30d), color: t => t.flow_30d < 0 ? 'negative' : 'positive' },
     ]
 
     return (
