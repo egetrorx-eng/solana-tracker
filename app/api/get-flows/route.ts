@@ -6,6 +6,39 @@ export const dynamic = 'force-dynamic'
 // Valid timeframes accepted by the frontend
 const VALID_TIMEFRAMES = ['1h', '24h', '7d', '30d', '5min', '10min', '6h']
 
+interface TokenData {
+    symbol: string
+    token_address: string
+    price_change: number
+    market_cap: number
+    smart_wallets: number
+    volume: number
+    liquidity: number
+    inflows: number
+    outflows: number
+    net_flows: number
+    flow_1h: number
+    flow_24h: number
+    flow_7d: number
+    flow_30d: number
+    token_age?: number
+    token_sectors?: string[]
+}
+
+interface NansenToken {
+    token_address:    string
+    token_symbol:     string
+    net_flow_1h_usd:  number
+    net_flow_24h_usd: number
+    net_flow_7d_usd:  number
+    net_flow_30d_usd: number
+    chain:            string
+    token_sectors:    string[]
+    trader_count:     number
+    token_age_days:   number
+    market_cap_usd:   number
+}
+
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams
