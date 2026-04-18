@@ -1,8 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
-const TIMEFRAMES = ['1H', '24H', '7D', '30D']
+const TIMEFRAMES = [
+    { label: '5MIN', api: '5min' },
+    { label: '10MIN', api: '10min' },
+    { label: '1H', api: '1h' },
+    { label: '6H', api: '6h' },
+    { label: '24H', api: '24h' },
+]
 
 interface TokenData {
     symbol: string
@@ -40,92 +46,14 @@ function formatFlow(num: number): string {
     return prefix + formatNumber(Math.abs(num))
 }
 
-interface SectorData {
-    name: string;
-    netFlow: number;
-    marketCap: number;
-    wallets: number;
-    tokenCount: number;
-}
-
-function SectorAnalytics({ data, totalMarketCap }: { data: TokenData[], totalMarketCap: number }) {
-    if (!data || data.length === 0) return null;
-
-    const sectorMap = new Map<string, SectorData>();
-
-    data.forEach(token => {
-        if (!token.token_sectors || token.token_sectors.length === 0) return;
-        token.token_sectors.forEach(sector => {
-            let s = sectorMap.get(sector);
-            if (!s) {
-                s = { name: sector, netFlow: 0, marketCap: 0, wallets: 0, tokenCount: 0 };
-                sectorMap.set(sector, s);
-            }
-            s.netFlow += (token.net_flows || 0);
-            s.marketCap += (token.market_cap || 0);
-            s.wallets += (token.smart_wallets || 0);
-            s.tokenCount += 1;
-        });
-    });
-
-    const sectors = Array.from(sectorMap.values())
-        .sort((a, b) => Math.abs(b.netFlow) - Math.abs(a.netFlow)) // Sort by absolute intensity
-        .slice(0, 4);
-
-    if (sectors.length === 0) return null;
-
-    const maxFlowAbs = Math.max(...sectors.map(s => Math.abs(s.netFlow))) || 1;
-
-    return (
-        <div className="sector-analytics">
-            <div className="sector-header">
-                <span>[:: SECTOR LEADERBOARD ::]</span>
-                <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{'// HIGHEST VOLUME SECTORS BY NET FLOW'}</span>
-            </div>
-            <div className="sector-grid">
-                {sectors.map(s => {
-                    const dominance = totalMarketCap > 0 ? ((s.marketCap / totalMarketCap) * 100).toFixed(1) : "0.0";
-                    const avgWallets = s.tokenCount > 0 ? Math.round(s.wallets / s.tokenCount) : 0;
-                    const fillWidth = Math.min((Math.abs(s.netFlow) / maxFlowAbs) * 50, 50);
-                    return (
-                        <div key={s.name} className="sector-card">
-                            <div className="sector-title">{s.name}</div>
-                            <div className="sector-stat">
-                                <span>NET FLOW</span>
-                                <span className={s.netFlow >= 0 ? 'positive' : 'negative'}>
-                                    {formatFlow(s.netFlow)}
-                                </span>
-                            </div>
-                            <div className="sector-stat">
-                                <span>DOMINANCE</span>
-                                <span>{dominance}%</span>
-                            </div>
-                            <div className="sector-stat">
-                                <span>AVG SMS</span>
-                                <span>{avgWallets}</span>
-                            </div>
-                            <div className="sector-pulse-tracker">
-                                <div 
-                                    className={`sector-pulse-fill ${s.netFlow >= 0 ? 'pos' : 'neg'}`} 
-                                    style={{ width: `${fillWidth}%` }}
-                                />
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
-    );
-}
-
 export default function Dashboard() {
-    const [timeframe, setTimeframe] = useState('1H')
+    const [timeframe, setTimeframe] = useState(TIMEFRAMES[2]) // default 1H
     const [data, setData] = useState<TokenData[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [sortKey, setSortKey] = useState<SortKey>('net_flows')
     const [sortDir, setSortDir] = useState<SortDirection>('desc')
-    const [countdown, setCountdown] = useState(30)
+    const [countdown, setCountdown] = useState(15)
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -135,10 +63,6 @@ export default function Dashboard() {
             setSortDir('desc')
         }
     }
-
-    const totalMarketCap = useMemo(() => {
-        return data.reduce((acc, t) => acc + (t.market_cap || 0), 0)
-    }, [data])
 
     const sortedData = [...data].sort((a, b) => {
         const valA = typeof a[sortKey] === 'string' ? (a[sortKey] as string) : (a[sortKey] as number) || 0
@@ -158,11 +82,11 @@ export default function Dashboard() {
         setLoading(true)
         setError(null)
         try {
-            const res = await fetch(`/api/get-flows?timeframe=${timeframe.toLowerCase()}`)
+            const res = await fetch(`/api/get-flows?timeframe=${timeframe.api}`)
             const json = await res.json()
             if (!res.ok) throw new Error(json.error || 'Failed to fetch')
             setData(json)
-            setCountdown(30)
+            setCountdown(15)
         } catch (err: unknown) {
             console.error('Fetch error:', err)
             setError((err as Error).message)
@@ -173,28 +97,19 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchData()
-        const interval = setInterval(fetchData, 30000)
+        const interval = setInterval(fetchData, 15000)
         return () => clearInterval(interval)
     }, [fetchData])
 
     useEffect(() => {
-        const timer = setInterval(() => setCountdown(prev => (prev > 0 ? prev - 1 : 30)), 1000)
+        const timer = setInterval(() => setCountdown(prev => (prev > 0 ? prev - 1 : 15)), 1000)
         return () => clearInterval(timer)
     }, [])
 
-    useEffect(() => {
-        const handleKey = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLInputElement) return
-            const num = parseInt(e.key)
-            if (num >= 1 && num <= 4) setTimeframe(TIMEFRAMES[num - 1])
-            if (e.key === 'r' || e.key === 'R') fetchData()
-        }
-        window.addEventListener('keydown', handleKey)
-        return () => window.removeEventListener('keydown', handleKey)
-    }, [fetchData])
+    const priceLabel = timeframe.api === '1h' ? '1H%' : '24H%'
 
     const columns: { key: SortKey; label: string; format: (t: TokenData) => string; align: string; color?: (t: TokenData) => string }[] = [
-        { key: 'price_change', label: timeframe === '1H' ? '1H%' : '24H%', align: 'right', format: t => `${t.price_change >= 0 ? '+' : ''}${t.price_change.toFixed(2)}%`, color: t => t.price_change < 0 ? 'negative' : 'positive' },
+        { key: 'price_change', label: priceLabel, align: 'right', format: t => `${t.price_change >= 0 ? '+' : ''}${t.price_change.toFixed(2)}%`, color: t => t.price_change < 0 ? 'negative' : 'positive' },
         { key: 'market_cap', label: 'MCAP', align: 'right', format: t => `$${formatNumber(t.market_cap)}` },
         { key: 'smart_wallets', label: 'SMS', align: 'center', format: t => String(t.smart_wallets) },
         { key: 'volume', label: 'VOL', align: 'right', format: t => `$${formatNumber(t.volume)}` },
@@ -229,23 +144,20 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* Sector Analytics */}
-            <SectorAnalytics data={data} totalMarketCap={totalMarketCap} />
-
             {/* Timeframe Buttons */}
             <div className="timeframe-bar">
-                {TIMEFRAMES.map((tf, idx) => (
+                {TIMEFRAMES.map(tf => (
                     <button
-                        key={tf}
+                        key={tf.label}
+                        id={`tf-btn-${tf.label.toLowerCase()}`}
                         onClick={() => setTimeframe(tf)}
-                        className={`tf-btn ${timeframe === tf ? 'active' : ''}`}
-                        title={`Press ${idx + 1}`}
+                        className={`tf-btn ${timeframe.label === tf.label ? 'active' : ''}`}
                     >
-                        {idx + 1}: {tf}
+                        {tf.label}
                     </button>
                 ))}
-                <button onClick={fetchData} className="tf-btn refresh-btn" title="Press R">
-                    R: REFRESH
+                <button id="btn-refresh" onClick={fetchData} className="tf-btn refresh-btn">
+                    ↻ REFRESH
                 </button>
             </div>
 
@@ -284,7 +196,7 @@ export default function Dashboard() {
                                     <td className="col-rank">{idx + 1}</td>
                                     <td className="col-symbol">
                                         <a
-                                            href={`https://dexscreener.com/solana/${token.token_address || token.symbol}`}
+                                            href={`https://www.nansen.ai/token-profiler?token_address=${token.token_address}&utm_source=gamefi`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -308,7 +220,7 @@ export default function Dashboard() {
 
             {/* Footer */}
             <footer className="tracker-footer">
-                KEYBOARD: 1-4 for timeframes | R to refresh | Data updates every 30 seconds
+                Data updates every 15 seconds | Powered by Nansen Smart Money API
             </footer>
         </div>
     )

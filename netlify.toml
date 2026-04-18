@@ -14,4 +14,4 @@
 
 [[scheduled-functions]]
   name = "update-flows"
-  cron = "*/5 * * * *"
+  cron = "* * * * *"

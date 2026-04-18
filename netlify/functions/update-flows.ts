@@ -174,5 +174,5 @@ export default async function handler() {
 
 // ── Netlify schedule config ───────────────────────────────────────────────────
 export const config: Config = {
-    schedule: '*/5 * * * *',   // every 5 minutes
+    schedule: '* * * * *',   // every minute
 }
