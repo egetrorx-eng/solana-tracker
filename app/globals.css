@@ -367,6 +367,110 @@ body {
   letter-spacing: 1px;
 }
 
+/* ---- Sector Analytics ---- */
+.sector-analytics {
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+  padding: 16px;
+  background: rgba(0, 255, 65, 0.02);
+  box-shadow: inset 0 0 20px rgba(0, 255, 65, 0.02);
+}
+
+.sector-header {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px var(--green-glow);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.sector-card {
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.sector-card:hover {
+  border-color: var(--green);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.sector-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  color: var(--green);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.sector-stat {
+  font-size: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  opacity: 0.8;
+}
+
+.sector-pulse-tracker {
+  height: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(0, 255, 65, 0.15);
+  margin-top: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sector-pulse-tracker::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  height: 100%;
+  width: 1px;
+  background: rgba(255,255,255,0.2);
+  z-index: 2;
+}
+
+.sector-pulse-fill {
+  height: 100%;
+  transition: width 0.5s ease-out;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.sector-pulse-fill.pos {
+  background: var(--green);
+  color: var(--green);
+  position: absolute;
+  left: 50%;
+  transform-origin: left;
+}
+
+.sector-pulse-fill.neg {
+  background: var(--red);
+  color: var(--red);
+  position: absolute;
+  right: 50%;
+  transform-origin: right;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
   .tracker-container {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 
 const TIMEFRAMES = ['1H', '24H', '7D', '30D']
 
@@ -40,6 +40,84 @@ function formatFlow(num: number): string {
     return prefix + formatNumber(Math.abs(num))
 }
 
+interface SectorData {
+    name: string;
+    netFlow: number;
+    marketCap: number;
+    wallets: number;
+    tokenCount: number;
+}
+
+function SectorAnalytics({ data, totalMarketCap }: { data: TokenData[], totalMarketCap: number }) {
+    if (!data || data.length === 0) return null;
+
+    const sectorMap = new Map<string, SectorData>();
+
+    data.forEach(token => {
+        if (!token.token_sectors || token.token_sectors.length === 0) return;
+        token.token_sectors.forEach(sector => {
+            let s = sectorMap.get(sector);
+            if (!s) {
+                s = { name: sector, netFlow: 0, marketCap: 0, wallets: 0, tokenCount: 0 };
+                sectorMap.set(sector, s);
+            }
+            s.netFlow += (token.net_flows || 0);
+            s.marketCap += (token.market_cap || 0);
+            s.wallets += (token.smart_wallets || 0);
+            s.tokenCount += 1;
+        });
+    });
+
+    const sectors = Array.from(sectorMap.values())
+        .sort((a, b) => Math.abs(b.netFlow) - Math.abs(a.netFlow)) // Sort by absolute intensity
+        .slice(0, 4);
+
+    if (sectors.length === 0) return null;
+
+    const maxFlowAbs = Math.max(...sectors.map(s => Math.abs(s.netFlow))) || 1;
+
+    return (
+        <div className="sector-analytics">
+            <div className="sector-header">
+                <span>[:: SECTOR LEADERBOARD ::]</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{'// HIGHEST VOLUME SECTORS BY NET FLOW'}</span>
+            </div>
+            <div className="sector-grid">
+                {sectors.map(s => {
+                    const dominance = totalMarketCap > 0 ? ((s.marketCap / totalMarketCap) * 100).toFixed(1) : "0.0";
+                    const avgWallets = s.tokenCount > 0 ? Math.round(s.wallets / s.tokenCount) : 0;
+                    const fillWidth = Math.min((Math.abs(s.netFlow) / maxFlowAbs) * 50, 50);
+                    return (
+                        <div key={s.name} className="sector-card">
+                            <div className="sector-title">{s.name}</div>
+                            <div className="sector-stat">
+                                <span>NET FLOW</span>
+                                <span className={s.netFlow >= 0 ? 'positive' : 'negative'}>
+                                    {formatFlow(s.netFlow)}
+                                </span>
+                            </div>
+                            <div className="sector-stat">
+                                <span>DOMINANCE</span>
+                                <span>{dominance}%</span>
+                            </div>
+                            <div className="sector-stat">
+                                <span>AVG SMS</span>
+                                <span>{avgWallets}</span>
+                            </div>
+                            <div className="sector-pulse-tracker">
+                                <div 
+                                    className={`sector-pulse-fill ${s.netFlow >= 0 ? 'pos' : 'neg'}`} 
+                                    style={{ width: `${fillWidth}%` }}
+                                />
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    );
+}
+
 export default function Dashboard() {
     const [timeframe, setTimeframe] = useState('1H')
     const [data, setData] = useState<TokenData[]>([])
@@ -57,6 +135,10 @@ export default function Dashboard() {
             setSortDir('desc')
         }
     }
+
+    const totalMarketCap = useMemo(() => {
+        return data.reduce((acc, t) => acc + (t.market_cap || 0), 0)
+    }, [data])
 
     const sortedData = [...data].sort((a, b) => {
         const valA = typeof a[sortKey] === 'string' ? (a[sortKey] as string) : (a[sortKey] as number) || 0
@@ -146,6 +228,9 @@ export default function Dashboard() {
                     </>
                 )}
             </div>
+
+            {/* Sector Analytics */}
+            <SectorAnalytics data={data} totalMarketCap={totalMarketCap} />
 
             {/* Timeframe Buttons */}
             <div className="timeframe-bar">
