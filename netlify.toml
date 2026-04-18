@@ -6,3 +6,12 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Scheduled function: polls Nansen API every 5 minutes and writes to Supabase
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[scheduled-functions]]
+  name = "update-flows"
+  cron = "*/5 * * * *"
