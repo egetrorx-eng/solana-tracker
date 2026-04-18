@@ -44,12 +44,13 @@ export async function GET(request: NextRequest) {
                 if (allError) throw allError
 
                 // 3. Group and merge
-                const tokenMap = new Map<string, any>()
+                const tokenMap = new Map<string, TokenData>()
                 
                 // Process newest rows first (already ordered by fetched_at)
                 allRows?.forEach(row => {
-                    if (!tokenMap.has(row.token_address)) {
-                        tokenMap.set(row.token_address, {
+                    const addr = row.token_address
+                    if (!tokenMap.has(addr)) {
+                        tokenMap.set(addr, {
                             symbol:        row.symbol,
                             token_address: row.token_address,
                             price_change:  row.price_change_pct || 0,
@@ -66,21 +67,21 @@ export async function GET(request: NextRequest) {
                             outflows:      0,
                             token_age:     row.token_age || 0,
                             token_sectors: row.token_sectors || [],
-                        })
+                        } as TokenData)
                     }
 
-                    const t = tokenMap.get(row.token_address)
+                    const t = tokenMap.get(addr)!
                     // Set specific timeframe flows
-                    if (row.timeframe === '1h')  t.flow_1h  = row.net_flows
-                    if (row.timeframe === '24h') t.flow_24h = row.net_flows
-                    if (row.timeframe === '7d')  t.flow_7d  = row.net_flows
-                    if (row.timeframe === '30d') t.flow_30d = row.net_flows
+                    if (row.timeframe === '1h')  t.flow_1h  = Number(row.net_flows)
+                    if (row.timeframe === '24h') t.flow_24h = Number(row.net_flows)
+                    if (row.timeframe === '7d')  t.flow_7d  = Number(row.net_flows)
+                    if (row.timeframe === '30d') t.flow_30d = Number(row.net_flows)
 
                     // Set active net_flows for current view
                     if (row.timeframe === dbTimeframe) {
-                        t.net_flows = row.net_flows
-                        t.inflows   = row.inflows
-                        t.outflows  = row.outflows
+                        t.net_flows = Number(row.net_flows)
+                        t.inflows   = Number(row.inflows)
+                        t.outflows  = Number(row.outflows)
                     }
                 })
 
@@ -110,9 +111,9 @@ export async function GET(request: NextRequest) {
 
         if (!res.ok) return NextResponse.json({ error: 'Nansen error' }, { status: 502 })
         const json = await res.json()
-        const tokens = json.data || []
+        const tokens: NansenToken[] = json.data || []
 
-        const formatted = tokens.map((t: any) => ({
+        const formatted = tokens.map(t => ({
             symbol: t.token_symbol,
             token_address: t.token_address,
             price_change: 0, 
@@ -124,17 +125,17 @@ export async function GET(request: NextRequest) {
             flow_24h: t.net_flow_24h_usd || 0,
             flow_7d: t.net_flow_7d_usd || 0,
             flow_30d: t.net_flow_30d_usd || 0,
-            net_flows: t[`net_flow_${dbTimeframe}_usd`] || 0,
-            inflows: (t[`net_flow_${dbTimeframe}_usd`] || 0) > 0 ? t[`net_flow_${dbTimeframe}_usd`] : 0,
-            outflows: (t[`net_flow_${dbTimeframe}_usd`] || 0) < 0 ? Math.abs(t[`net_flow_${dbTimeframe}_usd`]) : 0,
+            net_flows: Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) || 0,
+            inflows: Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) > 0 ? Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) : 0,
+            outflows: Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) < 0 ? Math.abs(Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken])) : 0,
             token_age: t.token_age_days || 0,
             token_sectors: t.token_sectors || [],
         }))
 
         return NextResponse.json(formatted)
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Error:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
     }
 }
