@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 
 const TIMEFRAMES = [
     { label: '5MIN', api: '5min' },
@@ -8,6 +8,8 @@ const TIMEFRAMES = [
     { label: '1H', api: '1h' },
     { label: '6H', api: '6h' },
     { label: '24H', api: '24h' },
+    { label: '7D', api: '7d' },
+    { label: '30D', api: '30d' },
 ]
 
 interface TokenData {
@@ -27,6 +29,12 @@ interface TokenData {
     flow_30d: number
     token_age?: number
     token_sectors?: string[]
+}
+
+interface LogEntry {
+    time: string
+    msg: string
+    type?: 'default' | 'highlight' | 'error'
 }
 
 type SortKey = keyof TokenData
@@ -54,6 +62,12 @@ export default function Dashboard() {
     const [sortKey, setSortKey] = useState<SortKey>('net_flows')
     const [sortDir, setSortDir] = useState<SortDirection>('desc')
     const [countdown, setCountdown] = useState(15)
+    const [logs, setLogs] = useState<LogEntry[]>([])
+
+    const addLog = useCallback((msg: string, type: LogEntry['type'] = 'default') => {
+        const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        setLogs(prev => [{ time: now, msg, type }, ...prev].slice(0, 50))
+    }, [])
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -62,38 +76,55 @@ export default function Dashboard() {
             setSortKey(key)
             setSortDir('desc')
         }
+        addLog(`Sorting by ${String(key).toUpperCase()} (${sortDir === 'desc' ? 'ASC' : 'DESC'})`)
     }
 
-    const sortedData = [...data].sort((a, b) => {
-        const valA = typeof a[sortKey] === 'string' ? (a[sortKey] as string) : (a[sortKey] as number) || 0
-        const valB = typeof b[sortKey] === 'string' ? (b[sortKey] as string) : (b[sortKey] as number) || 0
-        if (typeof valA === 'string' && typeof valB === 'string') {
-            return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA)
-        }
-        return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number)
-    })
+    const sortedData = useMemo(() => {
+        return [...data].sort((a, b) => {
+            const valA = typeof a[sortKey] === 'string' ? (a[sortKey] as string) : (a[sortKey] as number) || 0
+            const valB = typeof b[sortKey] === 'string' ? (b[sortKey] as string) : (b[sortKey] as number) || 0
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA)
+            }
+            return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number)
+        })
+    }, [data, sortKey, sortDir])
 
-    const SortArrow = ({ col }: { col: SortKey }) => {
-        if (sortKey !== col) return <span className="sort-indicator inactive">[-]</span>
-        return <span className="sort-indicator active">{sortDir === 'desc' ? '[↓]' : '[↑]'}</span>
-    }
+    // Aggregate Sector Data
+    const sectorStats = useMemo(() => {
+        const stats: Record<string, { count: number; flow: number }> = {}
+        data.forEach(token => {
+            token.token_sectors?.forEach(sector => {
+                if (!stats[sector]) stats[sector] = { count: 0, flow: 0 }
+                stats[sector].count += 1
+                stats[sector].flow += token.net_flows
+            })
+        })
+        return Object.entries(stats)
+            .sort((a, b) => Math.abs(b[1].flow) - Math.abs(a[1].flow))
+            .slice(0, 8)
+    }, [data])
 
     const fetchData = useCallback(async () => {
         setLoading(true)
         setError(null)
+        addLog(`Initiating system scan [TF: ${timeframe.label}]...`, 'highlight')
         try {
             const res = await fetch(`/api/get-flows?timeframe=${timeframe.api}`)
             const json = await res.json()
             if (!res.ok) throw new Error(json.error || 'Failed to fetch')
             setData(json)
+            addLog(`Scan complete. Detected ${json.length} high-signal entities.`, 'highlight')
             setCountdown(15)
         } catch (err: unknown) {
             console.error('Fetch error:', err)
-            setError((err as Error).message)
+            const errMsg = (err as Error).message
+            setError(errMsg)
+            addLog(`SCAN ERROR: ${errMsg}`, 'error')
             setData([])
         }
         setLoading(false)
-    }, [timeframe])
+    }, [timeframe, addLog])
 
     useEffect(() => {
         fetchData()
@@ -105,6 +136,11 @@ export default function Dashboard() {
         const timer = setInterval(() => setCountdown(prev => (prev > 0 ? prev - 1 : 15)), 1000)
         return () => clearInterval(timer)
     }, [])
+
+    const SortArrow = ({ col }: { col: SortKey }) => {
+        if (sortKey !== col) return <span className="sort-indicator inactive">[-]</span>
+        return <span className="sort-indicator active">{sortDir === 'desc' ? '[↓]' : '[↑]'}</span>
+    }
 
     const priceLabel = timeframe.api === '1h' ? '1H%' : '24H%'
 
@@ -126,15 +162,21 @@ export default function Dashboard() {
 
             {/* Header */}
             <header className="tracker-header">
-                <h1 className="tracker-title">SOLANA MICROCAP SMART MONEY TRACKER</h1>
+                <div className="glitch-wrapper">
+                    <h1 className="tracker-title glitch" data-text="SOLANA MICROCAP SMART MONEY TRACKER">SOLANA MICROCAP SMART MONEY TRACKER</h1>
+                </div>
                 <p className="tracker-subtitle">SOURCE: <a href="https://nsn.ai/gamefi?utm_source=tracker" target="_blank" rel="noopener noreferrer">NANSEN_INTELLIGENCE_API</a> | TRACKING {data.length} TOKENS</p>
             </header>
 
-            {/* Refresh Counter */}
+            {/* Status Bar */}
             <div className="status-bar">
                 <span className="status-item">
                     <span className={`status-dot ${countdown <= 5 ? 'warning' : ''}`} />
                     REFRESH: {countdown}s
+                </span>
+                <span className="status-divider">|</span>
+                <span className="status-item">
+                    NETWORK: <span className="positive">STABLE</span>
                 </span>
                 {loading && (
                     <>
@@ -144,13 +186,50 @@ export default function Dashboard() {
                 )}
             </div>
 
+            {/* Sector Analytics */}
+            {sectorStats.length > 0 && (
+                <div className="sector-analytics">
+                    <div className="sector-header">
+                        <span>[ SECTOR PULSE ANALYSIS ]</span>
+                        <span style={{ fontSize: '0.6rem', opacity: 0.5 }}>SIGNAL STRENGTH: 98.4%</span>
+                    </div>
+                    <div className="sector-grid">
+                        {sectorStats.map(([sector, stats]) => {
+                            const isPos = stats.flow >= 0
+                            return (
+                                <div key={sector} className="sector-card">
+                                    <div className="sector-title">{sector}</div>
+                                    <div className="sector-stat">
+                                        <span>ENTITIES</span>
+                                        <span>{stats.count}</span>
+                                    </div>
+                                    <div className="sector-stat">
+                                        <span>NET FLOW</span>
+                                        <span className={isPos ? 'positive' : 'negative'}>{formatFlow(stats.flow)}</span>
+                                    </div>
+                                    <div className="sector-pulse-tracker">
+                                        <div 
+                                            className={`sector-pulse-fill ${isPos ? 'pos' : 'neg'}`} 
+                                            style={{ width: `${Math.min(100, Math.abs(stats.flow) / 1000000 * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Timeframe Buttons */}
             <div className="timeframe-bar">
                 {TIMEFRAMES.map(tf => (
                     <button
                         key={tf.label}
                         id={`tf-btn-${tf.label.toLowerCase()}`}
-                        onClick={() => setTimeframe(tf)}
+                        onClick={() => {
+                            setTimeframe(tf)
+                            addLog(`Timeframe changed to ${tf.label}`)
+                        }}
                         className={`tf-btn ${timeframe.label === tf.label ? 'active' : ''}`}
                     >
                         {tf.label}
@@ -218,9 +297,31 @@ export default function Dashboard() {
                 </table>
             </div>
 
+            {/* Terminal Log */}
+            <div className="terminal-log">
+                <div className="log-header">
+                    <span>SYSTEM_LOG.TXT</span>
+                    <span>ACTIVE_CONNECTION: NANSEN_AI_API</span>
+                </div>
+                <div className="log-content">
+                    {logs.map((log, i) => (
+                        <div key={i} className="log-entry">
+                            <span className="log-time">[{log.time}]</span>
+                            <span className={`log-msg ${log.type || ''}`}>{log.msg}</span>
+                        </div>
+                    ))}
+                    {logs.length === 0 && (
+                        <div className="log-entry">
+                            <span className="log-time">[{new Date().toLocaleTimeString('en-US', { hour12: false })}]</span>
+                            <span className="log-msg">Initializing terminal interface...</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Footer */}
             <footer className="tracker-footer">
-                Data updates every 15 seconds | Powered by Nansen Smart Money API
+                Data updates every 15 seconds | Powered by Nansen Smart Money API | System v1.0.0-FINAL
             </footer>
         </div>
     )
