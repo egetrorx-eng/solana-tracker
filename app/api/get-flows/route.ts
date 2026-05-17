@@ -51,79 +51,85 @@ export async function GET(request: NextRequest) {
 
         const supabaseClient = getSupabase()
 
+        const supabaseClient = getSupabase()
+
         if (supabaseClient) {
-            // 1. Get the top 20 tokens for the requested timeframe
-            const { data: topTokens, error: topError } = await supabaseClient
-                .from('token_flows')
-                .select('symbol, token_address')
-                .eq('timeframe', dbTimeframe)
-                .order('net_flows', { ascending: false })
-                .order('fetched_at', { ascending: false })
-                .limit(40) // Fetch a bit more to handle deduplication later
-
-            if (topError) throw topError
-
-            if (topTokens && topTokens.length > 0) {
-                // Deduplicate addresses
-                const addresses = Array.from(new Set(topTokens.map(t => t.token_address))).slice(0, 20)
-
-                // 2. Fetch ALL timeframe rows for these 20 addresses to merge data
-                const { data: allRows, error: allError } = await supabaseClient
+            try {
+                // 1. Get the top 20 tokens for the requested timeframe
+                const { data: topTokens, error: topError } = await supabaseClient
                     .from('token_flows')
-                    .select('*')
-                    .in('token_address', addresses)
+                    .select('symbol, token_address')
+                    .eq('timeframe', dbTimeframe)
+                    .order('net_flows', { ascending: false })
                     .order('fetched_at', { ascending: false })
+                    .limit(40) // Fetch a bit more to handle deduplication later
 
-                if (allError) throw allError
+                if (topError) throw topError
 
-                // 3. Group and merge
-                const tokenMap = new Map<string, TokenData>()
-                
-                // Process newest rows first (already ordered by fetched_at)
-                allRows?.forEach(row => {
-                    const addr = row.token_address
-                    if (!tokenMap.has(addr)) {
-                        tokenMap.set(addr, {
-                            symbol:        row.symbol,
-                            token_address: row.token_address,
-                            price_change:  row.price_change_pct || 0,
-                            market_cap:    row.market_cap || 0,
-                            smart_wallets: row.smart_wallet_count || 0,
-                            volume:        row.volume || 0,
-                            liquidity:     row.liquidity || 0,
-                            flow_1h:       0,
-                            flow_24h:      0,
-                            flow_7d:       0,
-                            flow_30d:      0,
-                            net_flows:     0,
-                            inflows:       0,
-                            outflows:      0,
-                            token_age:     row.token_age || 0,
-                            token_sectors: row.token_sectors || [],
-                        } as TokenData)
-                    }
+                if (topTokens && topTokens.length > 0) {
+                    // Deduplicate addresses
+                    const addresses = Array.from(new Set(topTokens.map(t => t.token_address))).slice(0, 20)
 
-                    const t = tokenMap.get(addr)!
-                    // Set specific timeframe flows
-                    if (row.timeframe === '1h')  t.flow_1h  = Number(row.net_flows)
-                    if (row.timeframe === '24h') t.flow_24h = Number(row.net_flows)
-                    if (row.timeframe === '7d')  t.flow_7d  = Number(row.net_flows)
-                    if (row.timeframe === '30d') t.flow_30d = Number(row.net_flows)
+                    // 2. Fetch ALL timeframe rows for these 20 addresses to merge data
+                    const { data: allRows, error: allError } = await supabaseClient
+                        .from('token_flows')
+                        .select('*')
+                        .in('token_address', addresses)
+                        .order('fetched_at', { ascending: false })
 
-                    // Set active net_flows for current view
-                    if (row.timeframe === dbTimeframe) {
-                        t.net_flows = Number(row.net_flows)
-                        t.inflows   = Number(row.inflows)
-                        t.outflows  = Number(row.outflows)
-                    }
-                })
+                    if (allError) throw allError
 
-                // Convert back to sorted array based on the requested timeframe's net_flows
-                const result = Array.from(tokenMap.values())
-                    .sort((a, b) => b.net_flows - a.net_flows)
-                    .slice(0, 20)
+                    // 3. Group and merge
+                    const tokenMap = new Map<string, TokenData>()
+                    
+                    // Process newest rows first (already ordered by fetched_at)
+                    allRows?.forEach(row => {
+                        const addr = row.token_address
+                        if (!tokenMap.has(addr)) {
+                            tokenMap.set(addr, {
+                                symbol:        row.symbol,
+                                token_address: row.token_address,
+                                price_change:  row.price_change_pct || 0,
+                                market_cap:    row.market_cap || 0,
+                                smart_wallets: row.smart_wallet_count || 0,
+                                volume:        row.volume || 0,
+                                liquidity:     row.liquidity || 0,
+                                flow_1h:       0,
+                                flow_24h:      0,
+                                flow_7d:       0,
+                                flow_30d:      0,
+                                net_flows:     0,
+                                inflows:       0,
+                                outflows:      0,
+                                token_age:     row.token_age || 0,
+                                token_sectors: row.token_sectors || [],
+                            } as TokenData)
+                        }
 
-                return NextResponse.json(result)
+                        const t = tokenMap.get(addr)!
+                        // Set specific timeframe flows
+                        if (row.timeframe === '1h')  t.flow_1h  = Number(row.net_flows)
+                        if (row.timeframe === '24h') t.flow_24h = Number(row.net_flows)
+                        if (row.timeframe === '7d')  t.flow_7d  = Number(row.net_flows)
+                        if (row.timeframe === '30d') t.flow_30d = Number(row.net_flows)
+
+                        // Set active net_flows for current view
+                        if (row.timeframe === dbTimeframe) {
+                            t.net_flows = Number(row.net_flows)
+                            t.inflows   = Number(row.inflows)
+                            t.outflows  = Number(row.outflows)
+                        }
+                    })
+
+                    // Convert back to sorted array based on the requested timeframe's net_flows
+                    const result = Array.from(tokenMap.values())
+                        .sort((a, b) => b.net_flows - a.net_flows)
+                        .slice(0, 20)
+
+                    return NextResponse.json(result)
+                }
+            } catch (supaError: unknown) {
+                console.warn('Supabase fetch failed, falling back to Nansen API directly. Error:', (supaError as Error).message)
             }
         }
 
