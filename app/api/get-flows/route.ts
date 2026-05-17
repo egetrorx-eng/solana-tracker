@@ -51,9 +51,10 @@ export async function GET(request: NextRequest) {
 
         const supabaseClient = getSupabase()
 
+        const skipSupabase = ['5min', '10min', '6h'].includes(rawTf)
         const supabaseClient = getSupabase()
 
-        if (supabaseClient) {
+        if (supabaseClient && !skipSupabase) {
             try {
                 // 1. Get the top 20 tokens for the requested timeframe
                 const { data: topTokens, error: topError } = await supabaseClient
@@ -136,19 +137,36 @@ export async function GET(request: NextRequest) {
         // ── Fallback ─────────────────────────────────────────────────────────
         // (Simplified live fetch if DB is empty, also limited to 20)
         const NANSEN_API_KEY = process.env.NANSEN_API_KEY
-        if (!NANSEN_API_KEY) return NextResponse.json({ error: 'Not configured' }, { status: 500 })
+        if (!NANSEN_API_KEY) return NextResponse.json({ error: 'Nansen API Key Not configured' }, { status: 500 })
 
-        const res = await fetch('https://api.nansen.ai/api/v1/smart-money/netflow', {
-            method: 'POST',
-            headers: { 'apiKey': NANSEN_API_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chains: ['solana'],
-                pagination: { page: 1, per_page: 20 },
-                order_by: [{ direction: 'DESC', field: `net_flow_${dbTimeframe}_usd` }],
-            }),
-        })
+        // Use the raw timeframe for Nansen directly (e.g. 5min, 10min) instead of mapping to 1h
+        const nansenField = `net_flow_${rawTf}_usd`
 
-        if (!res.ok) return NextResponse.json({ error: 'Nansen error' }, { status: 502 })
+        let res;
+        try {
+            res = await fetch('https://api.nansen.ai/api/v1/smart-money/netflow', {
+                method: 'POST',
+                headers: { 
+                    'apiKey': NANSEN_API_KEY, 
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                body: JSON.stringify({
+                    chains: ['solana'],
+                    pagination: { page: 1, per_page: 20 },
+                    order_by: [{ direction: 'DESC', field: nansenField }],
+                }),
+            })
+        } catch (fetchErr: any) {
+            console.error('Nansen API fetch failed:', fetchErr)
+            return NextResponse.json({ error: `Nansen Network Error: ${fetchErr.message}` }, { status: 500 })
+        }
+
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '')
+            return NextResponse.json({ error: `Nansen HTTP Error ${res.status}: ${txt}` }, { status: res.status })
+        }
+
         const json = await res.json()
         const tokens: NansenToken[] = json.data || []
 
@@ -164,9 +182,9 @@ export async function GET(request: NextRequest) {
             flow_24h: t.net_flow_24h_usd || 0,
             flow_7d: t.net_flow_7d_usd || 0,
             flow_30d: t.net_flow_30d_usd || 0,
-            net_flows: Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) || 0,
-            inflows: Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) > 0 ? Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) : 0,
-            outflows: Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken]) < 0 ? Math.abs(Number(t[`net_flow_${dbTimeframe}_usd` as keyof NansenToken])) : 0,
+            net_flows: Number((t as any)[nansenField]) || 0,
+            inflows: Number((t as any)[nansenField]) > 0 ? Number((t as any)[nansenField]) : 0,
+            outflows: Number((t as any)[nansenField]) < 0 ? Math.abs(Number((t as any)[nansenField])) : 0,
             token_age: t.token_age_days || 0,
             token_sectors: t.token_sectors || [],
         }))
