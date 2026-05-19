@@ -105,11 +105,12 @@ Netlify will automatically:
 
 ### GET /api/get-flows
 
-Fetch token flow data for a specific timeframe.
+Fetch token flow data for a specific timeframe. Uses a dual-fetching architecture:
+- **Long-term timeframes** (`1h`, `24h`, `7d`, `30d`) are fetched from the highly-optimized Supabase cache to ensure rapid loading.
+- **Short-term timeframes** (`5min`, `10min`, `6h`) bypass the cache and fetch data directly from the Nansen Smart Money API in real-time.
 
 **Query Parameters:**
-**Query Parameters:**
-- `timeframe` (optional): `5min`, `10min`, `1h`, `6h`, `24h` (default: `1h`)
+- `timeframe` (optional): `5min`, `10min`, `1h`, `6h`, `24h`, `7d`, `30d` (default: `1h`)
 
 **Response:**
 ```json
@@ -123,7 +124,9 @@ Fetch token flow data for a specific timeframe.
     "liquidity": 97.22,
     "inflows": 952.67,
     "outflows": 85.74,
-    "net_flows": 666.87
+    "net_flows": 666.87,
+    "flow_1h": 666.87,
+    "token_sectors": ["Meme"]
   }
 ]
 ```
@@ -132,8 +135,8 @@ Fetch token flow data for a specific timeframe.
 
 The `update-flows` function runs every **1 minute** to:
 
-1. Fetch Solana microcap tokens from Nansen API
-2. Calculate metrics for all 7 timeframes
+1. Fetch Solana microcap tokens from Nansen API (focusing on `1h`, `24h`, `7d`, `30d` metrics)
+2. Calculate metrics and format them for the cache
 3. Insert data into Supabase
 4. Clean up data older than 24 hours
 
