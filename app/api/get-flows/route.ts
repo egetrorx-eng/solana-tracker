@@ -156,9 +156,10 @@ export async function GET(request: NextRequest) {
                     order_by: [{ direction: 'DESC', field: nansenField }],
                 }),
             })
-        } catch (fetchErr: any) {
+        } catch (fetchErr: unknown) {
             console.error('Nansen API fetch failed:', fetchErr)
-            return NextResponse.json({ error: `Nansen Network Error: ${fetchErr.message}` }, { status: 500 })
+            const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
+            return NextResponse.json({ error: `Nansen Network Error: ${msg}` }, { status: 500 })
         }
 
         if (!res.ok) {
@@ -169,24 +170,27 @@ export async function GET(request: NextRequest) {
         const json = await res.json()
         const tokens: NansenToken[] = json.data || []
 
-        const formatted = tokens.map(t => ({
-            symbol: t.token_symbol,
-            token_address: t.token_address,
-            price_change: 0, 
-            market_cap: t.market_cap_usd || 0,
-            smart_wallets: t.trader_count || 0,
-            volume: 0,
-            liquidity: 0,
-            flow_1h: t.net_flow_1h_usd || 0,
-            flow_24h: t.net_flow_24h_usd || 0,
-            flow_7d: t.net_flow_7d_usd || 0,
-            flow_30d: t.net_flow_30d_usd || 0,
-            net_flows: Number((t as any)[nansenField]) || 0,
-            inflows: Number((t as any)[nansenField]) > 0 ? Number((t as any)[nansenField]) : 0,
-            outflows: Number((t as any)[nansenField]) < 0 ? Math.abs(Number((t as any)[nansenField])) : 0,
-            token_age: t.token_age_days || 0,
-            token_sectors: t.token_sectors || [],
-        }))
+        const formatted = tokens.map(t => {
+            const netFlow = Number((t as unknown as Record<string, number>)[nansenField]) || 0
+            return {
+                symbol: t.token_symbol,
+                token_address: t.token_address,
+                price_change: 0, 
+                market_cap: t.market_cap_usd || 0,
+                smart_wallets: t.trader_count || 0,
+                volume: 0,
+                liquidity: 0,
+                flow_1h: t.net_flow_1h_usd || 0,
+                flow_24h: t.net_flow_24h_usd || 0,
+                flow_7d: t.net_flow_7d_usd || 0,
+                flow_30d: t.net_flow_30d_usd || 0,
+                net_flows: netFlow,
+                inflows: netFlow > 0 ? netFlow : 0,
+                outflows: netFlow < 0 ? Math.abs(netFlow) : 0,
+                token_age: t.token_age_days || 0,
+                token_sectors: t.token_sectors || [],
+            }
+        })
 
         return NextResponse.json(formatted)
 

@@ -3,10 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 
 const TIMEFRAMES = [
-    { label: '5MIN', api: '5min' },
-    { label: '10MIN', api: '10min' },
     { label: '1H', api: '1h' },
-    { label: '6H', api: '6h' },
     { label: '24H', api: '24h' },
     { label: '7D', api: '7d' },
     { label: '30D', api: '30d' },
