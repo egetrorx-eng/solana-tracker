@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
         const supabaseClient = getSupabase()
 
         const skipSupabase = ['5min', '10min', '6h'].includes(rawTf)
-        const supabaseClient = getSupabase()
 
         if (supabaseClient && !skipSupabase) {
             try {
