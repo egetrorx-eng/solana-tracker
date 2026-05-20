@@ -56,11 +56,19 @@ export default function Dashboard() {
     const [sortDir, setSortDir] = useState<SortDirection>('desc')
     const [countdown, setCountdown] = useState(15)
     const [logs, setLogs] = useState<LogEntry[]>([])
+    const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
 
     const addLog = useCallback((msg: string, type: LogEntry['type'] = 'default') => {
         const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
         setLogs(prev => [{ time: now, msg, type }, ...prev].slice(0, 50))
     }, [])
+
+    const handleCopy = (address: string) => {
+        navigator.clipboard.writeText(address)
+        setCopiedAddress(address)
+        addLog(`Copied contract address: ${address.slice(0, 6)}...${address.slice(-4)}`, 'highlight')
+        setTimeout(() => setCopiedAddress(null), 2000)
+    }
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -197,7 +205,7 @@ export default function Dashboard() {
                             {columns.map(col => (
                                 <th
                                     key={col.key}
-                                    className={`sortable align-${col.align}`}
+                                    className={`sortable align-${col.align} ${sortKey === col.key ? 'active-col-header' : ''}`}
                                     onClick={() => handleSort(col.key)}
                                 >
                                     {col.label} <SortArrow col={col.key} />
@@ -219,18 +227,50 @@ export default function Dashboard() {
                                 <tr key={`${token.symbol}-${idx}`} className="data-row">
                                     <td className="col-rank">{idx + 1}</td>
                                     <td className="col-symbol">
-                                        <a
-                                            href="https://nsn.ai/gamefi"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            {token.symbol} ↗
-                                        </a>
+                                        <div className="symbol-cell-container">
+                                            <a
+                                                href="https://nsn.ai/gamefi"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="token-name-link"
+                                            >
+                                                {token.symbol}
+                                            </a>
+                                            {token.token_address && (
+                                                <div className="token-actions">
+                                                    <button 
+                                                        onClick={() => handleCopy(token.token_address!)}
+                                                        className="action-btn copy-btn"
+                                                        title="Copy Mint Address"
+                                                    >
+                                                        {copiedAddress === token.token_address ? '✓' : '📋'}
+                                                    </button>
+                                                    <a 
+                                                        href={`https://dexscreener.com/solana/${token.token_address}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="action-btn dex-btn"
+                                                        title="View on DexScreener"
+                                                    >
+                                                        📊
+                                                    </a>
+                                                    <a 
+                                                        href={`https://solscan.io/token/${token.token_address}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="action-btn scan-btn"
+                                                        title="View on Solscan"
+                                                    >
+                                                        🔍
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
                                     {columns.map(col => (
                                         <td
                                             key={col.key}
-                                            className={`align-${col.align} ${col.color ? col.color(token) : ''}`}
+                                            className={`align-${col.align} ${col.color ? col.color(token) : ''} ${sortKey === col.key ? 'active-col-cell' : ''}`}
                                         >
                                             {col.format(token)}
                                         </td>
@@ -266,7 +306,7 @@ export default function Dashboard() {
 
             {/* Footer */}
             <footer className="tracker-footer">
-                Data updates every 15 seconds | Powered by Nansen Smart Money API | System v2.1.0
+                Data updates every 15 seconds | Powered by Nansen Smart Money API | System v2.2.0
             </footer>
         </div>
     )
