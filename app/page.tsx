@@ -5,8 +5,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 const TIMEFRAMES = [
     { label: '1H', api: '1h' },
     { label: '24H', api: '24h' },
-    { label: '7D', api: '7d' },
-    { label: '30D', api: '30d' },
 ]
 
 interface TokenData {
@@ -15,15 +13,11 @@ interface TokenData {
     price_change: number
     market_cap: number
     smart_wallets: number
-    volume: number
-    liquidity: number
     inflows: number
     outflows: number
     net_flows: number
     flow_1h: number
     flow_24h: number
-    flow_7d: number
-    flow_30d: number
     token_age?: number
     token_sectors?: string[]
 }
@@ -52,7 +46,7 @@ function formatFlow(num: number): string {
 }
 
 export default function Dashboard() {
-    const [timeframe, setTimeframe] = useState(TIMEFRAMES[2]) // default 1H
+    const [timeframe, setTimeframe] = useState(TIMEFRAMES[0]) // default 1H
     const [data, setData] = useState<TokenData[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -86,21 +80,6 @@ export default function Dashboard() {
             return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number)
         })
     }, [data, sortKey, sortDir])
-
-    // Aggregate Sector Data
-    const sectorStats = useMemo(() => {
-        const stats: Record<string, { count: number; flow: number }> = {}
-        data.forEach(token => {
-            token.token_sectors?.forEach(sector => {
-                if (!stats[sector]) stats[sector] = { count: 0, flow: 0 }
-                stats[sector].count += 1
-                stats[sector].flow += token.net_flows
-            })
-        })
-        return Object.entries(stats)
-            .sort((a, b) => Math.abs(b[1].flow) - Math.abs(a[1].flow))
-            .slice(0, 8)
-    }, [data])
 
     const fetchData = useCallback(async () => {
         setLoading(true)
@@ -139,18 +118,12 @@ export default function Dashboard() {
         return <span className="sort-indicator active">{sortDir === 'desc' ? '[↓]' : '[↑]'}</span>
     }
 
-    const priceLabel = timeframe.api === '1h' ? '1H%' : '24H%'
-
     const columns: { key: SortKey; label: string; format: (t: TokenData) => string; align: string; color?: (t: TokenData) => string }[] = [
-        { key: 'price_change', label: priceLabel, align: 'right', format: t => `${t.price_change >= 0 ? '+' : ''}${t.price_change.toFixed(2)}%`, color: t => t.price_change < 0 ? 'negative' : 'positive' },
         { key: 'market_cap', label: 'MCAP', align: 'right', format: t => `$${formatNumber(t.market_cap)}` },
-        { key: 'smart_wallets', label: 'SMS', align: 'center', format: t => String(t.smart_wallets) },
-        { key: 'volume', label: 'VOL', align: 'right', format: t => `$${formatNumber(t.volume)}` },
-        { key: 'liquidity', label: 'LIQ', align: 'right', format: t => `$${formatNumber(t.liquidity)}` },
+        { key: 'smart_wallets', label: 'WALLETS', align: 'center', format: t => String(t.smart_wallets) },
         { key: 'net_flows', label: `${timeframe.label} FLOW`, align: 'right', format: t => formatFlow(t.net_flows), color: t => t.net_flows < 0 ? 'negative' : 'positive' },
         { key: 'flow_1h', label: '1H FLOW', align: 'right', format: t => formatFlow(t.flow_1h), color: t => t.flow_1h < 0 ? 'negative' : 'positive' },
         { key: 'flow_24h', label: '24H FLOW', align: 'right', format: t => formatFlow(t.flow_24h), color: t => t.flow_24h < 0 ? 'negative' : 'positive' },
-        { key: 'flow_7d', label: '7D FLOW', align: 'right', format: t => formatFlow(t.flow_7d), color: t => t.flow_7d < 0 ? 'negative' : 'positive' },
     ]
 
     return (
@@ -182,40 +155,6 @@ export default function Dashboard() {
                     </>
                 )}
             </div>
-
-            {/* Sector Analytics */}
-            {sectorStats.length > 0 && (
-                <div className="sector-analytics">
-                    <div className="sector-header">
-                        <span>[ SECTOR PULSE ANALYSIS ]</span>
-                        <span style={{ fontSize: '0.6rem', opacity: 0.5 }}>SIGNAL STRENGTH: 98.4%</span>
-                    </div>
-                    <div className="sector-grid">
-                        {sectorStats.map(([sector, stats]) => {
-                            const isPos = stats.flow >= 0
-                            return (
-                                <div key={sector} className="sector-card">
-                                    <div className="sector-title">{sector}</div>
-                                    <div className="sector-stat">
-                                        <span>ENTITIES</span>
-                                        <span>{stats.count}</span>
-                                    </div>
-                                    <div className="sector-stat">
-                                        <span>NET FLOW</span>
-                                        <span className={isPos ? 'positive' : 'negative'}>{formatFlow(stats.flow)}</span>
-                                    </div>
-                                    <div className="sector-pulse-tracker">
-                                        <div 
-                                            className={`sector-pulse-fill ${isPos ? 'pos' : 'neg'}`} 
-                                            style={{ width: `${Math.min(100, Math.abs(stats.flow) / 1000000 * 100)}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
-            )}
 
             {/* Timeframe Buttons */}
             <div className="timeframe-bar">
@@ -260,7 +199,7 @@ export default function Dashboard() {
                     <tbody>
                         {sortedData.length === 0 && !loading ? (
                             <tr>
-                                <td colSpan={11} className="empty-state">
+                                <td colSpan={7} className="empty-state">
                                     <div className="empty-icon">[ ! ]</div>
                                     <p>{error ? `ERROR: ${error}` : 'NO SPECTRAL DATA DETECTED IN THIS TIMEFRAME'}</p>
                                     <button onClick={fetchData} className="retry-btn">RETRY SYSTEM SCAN</button>
@@ -318,7 +257,7 @@ export default function Dashboard() {
 
             {/* Footer */}
             <footer className="tracker-footer">
-                Data updates every 15 seconds | Powered by Nansen Smart Money API | System v1.0.0-FINAL
+                Data updates every 15 seconds | Powered by Nansen Smart Money API | System v2.0.0
             </footer>
         </div>
     )
