@@ -14,7 +14,6 @@ const TIMEFRAMES: Record<string, string> = {
     '1h':  'net_flow_1h_usd',
     '24h': 'net_flow_24h_usd',
     '7d':  'net_flow_7d_usd',
-    '30d': 'net_flow_30d_usd',
 }
 
 // DexScreener price-change key per timeframe
@@ -22,7 +21,6 @@ const DEX_KEY: Record<string, string> = {
     '1h':  'h1',
     '24h': 'h24',
     '7d':  'h24',
-    '30d': 'h24',
 }
 
 interface NansenToken {

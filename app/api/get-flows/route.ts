@@ -4,7 +4,7 @@ import { getSupabase } from '@/lib/supabase'
 export const dynamic = 'force-dynamic'
 
 // Valid timeframes supported by the Nansen API
-const VALID_TIMEFRAMES = ['1h', '24h']
+const VALID_TIMEFRAMES = ['1h', '24h', '7d']
 
 interface NansenToken {
     token_address:    string
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
                         smart_wallets: number
                         flow_1h: number
                         flow_24h: number
+                        flow_7d: number
                         net_flows: number
                         inflows: number
                         outflows: number
@@ -78,6 +79,7 @@ export async function GET(request: NextRequest) {
                                 smart_wallets: row.smart_wallet_count || 0,
                                 flow_1h:       0,
                                 flow_24h:      0,
+                                flow_7d:       0,
                                 net_flows:     0,
                                 inflows:       0,
                                 outflows:      0,
@@ -89,6 +91,7 @@ export async function GET(request: NextRequest) {
                         const t = tokenMap.get(addr)!
                         if (row.timeframe === '1h')  t.flow_1h  = Number(row.net_flows)
                         if (row.timeframe === '24h') t.flow_24h = Number(row.net_flows)
+                        if (row.timeframe === '7d')  t.flow_7d  = Number(row.net_flows)
 
                         if (row.timeframe === timeframe) {
                             t.net_flows = Number(row.net_flows)
@@ -152,6 +155,7 @@ export async function GET(request: NextRequest) {
                 smart_wallets: t.trader_count || 0,
                 flow_1h: t.net_flow_1h_usd || 0,
                 flow_24h: t.net_flow_24h_usd || 0,
+                flow_7d: t.net_flow_7d_usd || 0,
                 net_flows: netFlow,
                 inflows: netFlow > 0 ? netFlow : 0,
                 outflows: netFlow < 0 ? Math.abs(netFlow) : 0,

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 const TIMEFRAMES = [
     { label: '1H', api: '1h' },
     { label: '24H', api: '24h' },
+    { label: '7D', api: '7d' },
 ]
 
 interface TokenData {
@@ -18,6 +19,7 @@ interface TokenData {
     net_flows: number
     flow_1h: number
     flow_24h: number
+    flow_7d: number
     token_age?: number
     token_sectors?: string[]
 }
@@ -120,10 +122,11 @@ export default function Dashboard() {
 
     const columns: { key: SortKey; label: string; format: (t: TokenData) => string; align: string; color?: (t: TokenData) => string }[] = [
         { key: 'market_cap', label: 'MCAP', align: 'right', format: t => `$${formatNumber(t.market_cap)}` },
-        { key: 'smart_wallets', label: 'WALLETS', align: 'center', format: t => String(t.smart_wallets) },
+        { key: 'smart_wallets', label: 'SMS', align: 'center', format: t => String(t.smart_wallets) },
         { key: 'net_flows', label: `${timeframe.label} FLOW`, align: 'right', format: t => formatFlow(t.net_flows), color: t => t.net_flows < 0 ? 'negative' : 'positive' },
         { key: 'flow_1h', label: '1H FLOW', align: 'right', format: t => formatFlow(t.flow_1h), color: t => t.flow_1h < 0 ? 'negative' : 'positive' },
         { key: 'flow_24h', label: '24H FLOW', align: 'right', format: t => formatFlow(t.flow_24h), color: t => t.flow_24h < 0 ? 'negative' : 'positive' },
+        { key: 'flow_7d', label: '7D FLOW', align: 'right', format: t => formatFlow(t.flow_7d), color: t => t.flow_7d < 0 ? 'negative' : 'positive' },
     ]
 
     return (
@@ -199,7 +202,7 @@ export default function Dashboard() {
                     <tbody>
                         {sortedData.length === 0 && !loading ? (
                             <tr>
-                                <td colSpan={7} className="empty-state">
+                                <td colSpan={8} className="empty-state">
                                     <div className="empty-icon">[ ! ]</div>
                                     <p>{error ? `ERROR: ${error}` : 'NO SPECTRAL DATA DETECTED IN THIS TIMEFRAME'}</p>
                                     <button onClick={fetchData} className="retry-btn">RETRY SYSTEM SCAN</button>
@@ -257,7 +260,7 @@ export default function Dashboard() {
 
             {/* Footer */}
             <footer className="tracker-footer">
-                Data updates every 15 seconds | Powered by Nansen Smart Money API | System v2.0.0
+                Data updates every 15 seconds | Powered by Nansen Smart Money API | System v2.1.0
             </footer>
         </div>
     )
