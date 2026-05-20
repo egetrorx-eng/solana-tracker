@@ -245,24 +245,6 @@ export default function Dashboard() {
                                                     >
                                                         {copiedAddress === token.token_address ? '✓' : '📋'}
                                                     </button>
-                                                    <a 
-                                                        href={`https://dexscreener.com/solana/${token.token_address}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="action-btn dex-btn"
-                                                        title="View on DexScreener"
-                                                    >
-                                                        📊
-                                                    </a>
-                                                    <a 
-                                                        href={`https://solscan.io/token/${token.token_address}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="action-btn scan-btn"
-                                                        title="View on Solscan"
-                                                    >
-                                                        🔍
-                                                    </a>
                                                 </div>
                                             )}
                                         </div>
