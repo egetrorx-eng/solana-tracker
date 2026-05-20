@@ -39,6 +39,14 @@ interface NansenToken {
     market_cap_usd:   number
 }
 
+interface DexPair {
+    baseToken:   { address: string; symbol: string }
+    priceChange: Record<string, number>
+    volume:      Record<string, number>
+    liquidity:   { usd: number }
+    fdv:         number
+}
+
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams
@@ -170,16 +178,49 @@ export async function GET(request: NextRequest) {
         const json = await res.json()
         const tokens: NansenToken[] = json.data || []
 
+        // ── DexScreener enrichment ────────────────────────────────────────
+        // Fetch price change, volume, and liquidity for the returned tokens
+        const addresses = tokens.map(t => t.token_address).filter(Boolean)
+        const dexMap = new Map<string, DexPair>()
+        const batchSize = 30
+        for (let i = 0; i < addresses.length; i += batchSize) {
+            const batch = addresses.slice(i, i + batchSize)
+            try {
+                const dexRes = await fetch(
+                    `https://api.dexscreener.com/latest/dex/tokens/${batch.join(',')}`,
+                    { signal: AbortSignal.timeout(5000) }
+                )
+                if (dexRes.ok) {
+                    const dexJson = await dexRes.json()
+                    const pairs: DexPair[] = dexJson.pairs || []
+                    pairs.forEach(pair => {
+                        const addr = pair.baseToken.address
+                        const existing = dexMap.get(addr)
+                        if (!existing || (pair.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
+                            dexMap.set(addr, pair)
+                        }
+                    })
+                }
+            } catch (dexErr: unknown) {
+                console.warn('DexScreener enrichment failed:', (dexErr instanceof Error) ? dexErr.message : String(dexErr))
+            }
+        }
+
+        // Map timeframe to DexScreener priceChange key
+        const dexPriceKey: Record<string, string> = { '1h': 'h1', '24h': 'h24', '7d': 'h24', '30d': 'h24' }
+        const priceKey = dexPriceKey[rawTf] || 'h24'
+
         const formatted = tokens.map(t => {
             const netFlow = Number((t as unknown as Record<string, number>)[nansenField]) || 0
+            const dex = dexMap.get(t.token_address)
             return {
                 symbol: t.token_symbol,
                 token_address: t.token_address,
-                price_change: 0, 
-                market_cap: t.market_cap_usd || 0,
+                price_change: dex?.priceChange?.[priceKey] || 0,
+                market_cap: t.market_cap_usd || dex?.fdv || 0,
                 smart_wallets: t.trader_count || 0,
-                volume: 0,
-                liquidity: 0,
+                volume: dex?.volume?.[priceKey] || 0,
+                liquidity: dex?.liquidity?.usd || 0,
                 flow_1h: t.net_flow_1h_usd || 0,
                 flow_24h: t.net_flow_24h_usd || 0,
                 flow_7d: t.net_flow_7d_usd || 0,
