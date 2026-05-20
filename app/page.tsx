@@ -52,7 +52,7 @@ export default function Dashboard() {
     const [data, setData] = useState<TokenData[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [sortKey, setSortKey] = useState<SortKey>('net_flows')
+    const [sortKey, setSortKey] = useState<SortKey>('flow_1h')
     const [sortDir, setSortDir] = useState<SortDirection>('desc')
     const [countdown, setCountdown] = useState(15)
     const [logs, setLogs] = useState<LogEntry[]>([])
@@ -123,7 +123,6 @@ export default function Dashboard() {
     const columns: { key: SortKey; label: string; format: (t: TokenData) => string; align: string; color?: (t: TokenData) => string }[] = [
         { key: 'market_cap', label: 'MCAP', align: 'right', format: t => `$${formatNumber(t.market_cap)}` },
         { key: 'smart_wallets', label: 'SMS', align: 'center', format: t => String(t.smart_wallets) },
-        { key: 'net_flows', label: `${timeframe.label} FLOW`, align: 'right', format: t => formatFlow(t.net_flows), color: t => t.net_flows < 0 ? 'negative' : 'positive' },
         { key: 'flow_1h', label: '1H FLOW', align: 'right', format: t => formatFlow(t.flow_1h), color: t => t.flow_1h < 0 ? 'negative' : 'positive' },
         { key: 'flow_24h', label: '24H FLOW', align: 'right', format: t => formatFlow(t.flow_24h), color: t => t.flow_24h < 0 ? 'negative' : 'positive' },
         { key: 'flow_7d', label: '7D FLOW', align: 'right', format: t => formatFlow(t.flow_7d), color: t => t.flow_7d < 0 ? 'negative' : 'positive' },
@@ -167,6 +166,13 @@ export default function Dashboard() {
                         id={`tf-btn-${tf.label.toLowerCase()}`}
                         onClick={() => {
                             setTimeframe(tf)
+                            const apiKeyToFieldMap: Record<string, SortKey> = {
+                                '1h': 'flow_1h',
+                                '24h': 'flow_24h',
+                                '7d': 'flow_7d'
+                            }
+                            setSortKey(apiKeyToFieldMap[tf.api] || 'flow_1h')
+                            setSortDir('desc')
                             addLog(`Timeframe changed to ${tf.label}`)
                         }}
                         className={`tf-btn ${timeframe.label === tf.label ? 'active' : ''}`}
@@ -202,7 +208,7 @@ export default function Dashboard() {
                     <tbody>
                         {sortedData.length === 0 && !loading ? (
                             <tr>
-                                <td colSpan={8} className="empty-state">
+                                <td colSpan={7} className="empty-state">
                                     <div className="empty-icon">[ ! ]</div>
                                     <p>{error ? `ERROR: ${error}` : 'NO SPECTRAL DATA DETECTED IN THIS TIMEFRAME'}</p>
                                     <button onClick={fetchData} className="retry-btn">RETRY SYSTEM SCAN</button>
