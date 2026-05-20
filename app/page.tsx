@@ -220,7 +220,7 @@ export default function Dashboard() {
                                     <td className="col-rank">{idx + 1}</td>
                                     <td className="col-symbol">
                                         <a
-                                            href={`https://www.nansen.ai/token-profiler?token_address=${token.token_address}&utm_source=gamefi`}
+                                            href={`https://www.nansen.ai/token-profiler?token_address=${token.token_address}&promoCode=gamefi&utm_campaign=Nansen+Affiliates&utm_medium=affiliates&utm_source=gamefi`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
